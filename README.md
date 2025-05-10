@@ -1,6 +1,6 @@
 # Crypto Bot API
 
-An API service that integrates with the Coinbase Advanced Trade API to access cryptocurrency account information and perform trading operations.
+Currently An API service that integrates with the Coinbase Advanced Trade API to access cryptocurrency account information and perform trading operations.
 
 ## Features
 
