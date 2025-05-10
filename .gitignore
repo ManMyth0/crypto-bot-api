@@ -6,8 +6,6 @@ project.lock.json
 .DS_Store
 *.pyc
 
-# Visual Studio Code
-.vscode
 
 # User-specific files
 *.suo
@@ -31,13 +29,11 @@ msbuild.log
 msbuild.err
 msbuild.wrn
 
-# Visual Studio
-.vs/
-
 # Sensitive Configuration
 appsettings.Development.json
 appsettings.secrets.json
 appsettings.Production.json
+appsettings.json
 secrets.json
 *.pfx
 *.key
