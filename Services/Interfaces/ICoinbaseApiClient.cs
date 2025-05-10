@@ -1,9 +1,12 @@
-﻿namespace crypto_bot_api.Services
+﻿using System.Threading.Tasks;
+using crypto_bot_api.Models.DTOs;
+
+namespace crypto_bot_api.Services
 {
     public interface ICoinbaseAccountApiClient
     {
-        Task<string> GetAccountsAsync();
-        Task<string> GetAccountDetailsAsync();
-        Task<string> GetAccountByUuidAsync(string account_uuid);
+        Task<AccountsResponseDto> GetAccountsAsync();
+        Task<AccountDetailResponseDto?> GetAccountDetailsAsync();
+        Task<AccountDetailResponseDto> GetAccountByUuidAsync(string account_uuid);
     }
 }

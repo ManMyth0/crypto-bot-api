@@ -1,8 +1,13 @@
-﻿using System.Net.Http.Headers;
+﻿using System;
+using System.Net.Http;
 using System.Text.Json;
+using crypto_bot_api.Helpers;
+using System.Threading.Tasks;
+using System.Net.Http.Headers;
+using crypto_bot_api.Models.DTOs;
 using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Models.Responses;
-using crypto_bot_api.Helpers;
+using Microsoft.Extensions.Configuration;
 
 namespace crypto_bot_api.Services
 {
@@ -32,7 +37,7 @@ namespace crypto_bot_api.Services
         }
 
         // Retrieves all Coinbase accounts
-        public async Task<string> GetAccountsAsync()
+        public async Task<AccountsResponseDto> GetAccountsAsync()
         {
             string endpoint = "/api/v3/brokerage/accounts";
             // Let the Ed25519JwtHelper add the hostname - just pass method and path
@@ -41,11 +46,13 @@ namespace crypto_bot_api.Services
             
             var jwt = _jwtHelper.GenerateJwt(uri);
 
-            return await SendAuthenticatedGetRequestAsync(jwt, fullUrl, "Failed to retrieve accounts.");
+            string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, "Failed to retrieve accounts.");
+            return JsonSerializer.Deserialize<AccountsResponseDto>(jsonResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) 
+                ?? new AccountsResponseDto();
         }
 
         // Retrieves details for a specific account.
-        public async Task<string> GetAccountByUuidAsync(string account_uuid)
+        public async Task<AccountDetailResponseDto> GetAccountByUuidAsync(string account_uuid)
         {
             string endpoint = $"/api/v3/brokerage/accounts/{account_uuid}";
             // Let the Ed25519JwtHelper add the hostname - just pass method and path
@@ -54,64 +61,36 @@ namespace crypto_bot_api.Services
         
             var jwt = _jwtHelper.GenerateJwt(uri);
 
-            return await SendAuthenticatedGetRequestAsync(jwt, fullUrl, $"Failed to retrieve account details for {account_uuid}.");
+            string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, $"Failed to retrieve account details for {account_uuid}.");
+            return JsonSerializer.Deserialize<AccountDetailResponseDto>(jsonResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? new AccountDetailResponseDto();
         }
 
-        public async Task<string> GetAccountDetailsAsync()
+        public async Task<AccountDetailResponseDto?> GetAccountDetailsAsync()
         {
             // Get all accounts
-            string allAccounts = await GetAccountsAsync();
+            var accountsResponse = await GetAccountsAsync();
             
-            // Parse the JSON to find an account with balance > 0, currently excludes incremental values in accounts IE: 0.0000000012345
-            try
+            if (accountsResponse.Accounts != null && accountsResponse.Accounts.Count > 0)
             {
-                var accounts = JsonSerializer.Deserialize<JsonElement>(allAccounts);
-                
-                // Check if accounts data exists and contains accounts
-                if (accounts.TryGetProperty("accounts", out var accountsArray) && 
-                    accountsArray.ValueKind == JsonValueKind.Array && 
-                    accountsArray.GetArrayLength() > 0)
+                // Iterate through accounts to find one with balance > 0
+                foreach (var account in accountsResponse.Accounts)
                 {
-                    // Iterate through accounts to find one with balance > 0
-                    for (int i = 0; i < accountsArray.GetArrayLength(); i++)
+                    if (account.AvailableBalance != null && 
+                        !string.IsNullOrEmpty(account.AvailableBalance.Value) &&
+                        decimal.TryParse(account.AvailableBalance.Value, out decimal balanceAmount) && 
+                        balanceAmount > 0)
                     {
-                        var account = accountsArray[i];
-                        if (account.TryGetProperty("available_balance", out var balance) &&
-                            balance.TryGetProperty("value", out var balanceValue))
+                        // Found an account with balance > 0, get its details
+                        if (!string.IsNullOrEmpty(account.Uuid))
                         {
-                            // Handle possible null value by using the null conditional operator
-                            string? balanceStr = balanceValue.ValueKind == JsonValueKind.String 
-                                ? balanceValue.GetString() 
-                                : null;
-                                
-                            if (!string.IsNullOrEmpty(balanceStr) && 
-                                decimal.TryParse(balanceStr, out decimal balanceAmount) && 
-                                balanceAmount > 0)
-                            {
-                                // Found an account with balance > 0, get its details
-                                if (account.TryGetProperty("uuid", out var uuidElement) && 
-                                    uuidElement.ValueKind == JsonValueKind.String)
-                                {
-                                    string? uuid = uuidElement.GetString();
-                                    if (!string.IsNullOrEmpty(uuid))
-                                    {
-                                        // Get detailed information for this account
-                                        return await GetAccountByUuidAsync(uuid);
-                                    }
-                                }
-                            }
+                            return await GetAccountByUuidAsync(account.Uuid);
                         }
                     }
                 }
-                
-                // If we couldn't find any suitable account, return the original response
-                return allAccounts;
-            }
-            catch (JsonException)
-            {
-                // If there's an error parsing the JSON, return the original response
-                return allAccounts;
-            }
+            }            
+            // If we couldn't find any suitable account throw new explicit exception
+            throw new CoinbaseApiException("No account with a positive balance could be found.");
         }
 
         // Sends an authenticated GET request to Coinbase and handles errors using our custom error handling.

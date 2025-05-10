@@ -1,6 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
-using crypto_bot_api.CustomExceptions;
+using System.Net.Mime;
 using crypto_bot_api.Services;
+using Microsoft.AspNetCore.Mvc;
+using crypto_bot_api.Models.DTOs;
+using crypto_bot_api.CustomExceptions;
 
 namespace crypto_bot_api.Controllers
 {
@@ -18,12 +20,12 @@ namespace crypto_bot_api.Controllers
         }
 
         [HttpGet("accounts")]
-        public async Task<IActionResult> GetAccounts()
+        public async Task<ActionResult<AccountsResponseDto>> GetAccounts()
         {
             try
             {
                 var result = await _coinbaseClient.GetAccountsAsync();
-                return Ok(result);
+                return result;
             }
             catch (CoinbaseApiException ex)
             {
@@ -36,12 +38,16 @@ namespace crypto_bot_api.Controllers
         }
 
         [HttpGet("account-details")]
-        public async Task<IActionResult> GetAccountDetails()
+        public async Task<ActionResult<AccountDetailResponseDto>> GetAccountDetails()
         {
             try
             {
                 var result = await _coinbaseClient.GetAccountDetailsAsync();
-                return Ok(result);
+                if (result == null)
+                {
+                    return NotFound(new { error = "No account found with positive balance" });
+                }
+                return result;
             }
             catch (CoinbaseApiException ex)
             {
@@ -54,12 +60,12 @@ namespace crypto_bot_api.Controllers
         }
 
         [HttpGet("account/{accountId}")]
-        public async Task<IActionResult> GetAccountById(string accountId)
+        public async Task<ActionResult<AccountDetailResponseDto>> GetAccountById(string accountId)
         {
             try
             {
                 var result = await _coinbaseClient.GetAccountByUuidAsync(accountId);
-                return Ok(result);
+                return result;
             }
             catch (CoinbaseApiException ex)
             {
