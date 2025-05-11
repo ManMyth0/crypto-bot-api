@@ -1,4 +1,3 @@
-﻿using System.Threading.Tasks;
 using crypto_bot_api.Models.DTOs;
 
 namespace crypto_bot_api.Services
@@ -9,4 +8,4 @@ namespace crypto_bot_api.Services
         Task<AccountDetailResponseDto?> GetAccountDetailsAsync();
         Task<AccountDetailResponseDto> GetAccountByUuidAsync(string account_uuid);
     }
-}
+} 

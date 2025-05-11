@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
 using crypto_bot_api.Data;
 using crypto_bot_api.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,8 +35,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Register services for CoinbaseAccountApiClient
+// Register services for Coinbase API clients
 builder.Services.AddScoped<ICoinbaseAccountApiClient, CoinbaseAccountApiClient>();
+builder.Services.AddScoped<ICoinbaseOrderApiClient, CoinbaseOrderApiClient>();
 
 // Add controllers to the container
 builder.Services.AddControllers();
