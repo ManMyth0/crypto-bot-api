@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <VSTest_ResultsDirectory></VSTest_ResultsDirectory>
+    <VSTest_NoLogo>true</VSTest_NoLogo>
+    <VSTest_Blame>false</VSTest_Blame>
+    <VSTest_Collect>false</VSTest_Collect>
+    <CollectCoverage>false</CollectCoverage>
+    <GenerateTestResults>false</GenerateTestResults>
+  </PropertyGroup>
+</Project> 

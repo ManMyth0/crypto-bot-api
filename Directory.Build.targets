@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <Target Name="VSTest" AfterTargets="Build">
+    <PropertyGroup>
+      <VSTestResultsDirectory>$(MSBuildProjectDirectory)\bin\$(Configuration)\net9.0\TestResults</VSTestResultsDirectory>
+    </PropertyGroup>
+  </Target>
+</Project> 
