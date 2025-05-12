@@ -18,10 +18,6 @@ var baseUrl = builder.Configuration["CoinbaseApi:baseUrl"];
 var apiKeyId = builder.Configuration["CoinbaseApi:ApiKeyId"];
 var apiSecret = builder.Configuration["CoinbaseApi:ApiSecret"];
 
-Console.WriteLine($"Coinbase API Base URL: {baseUrl}");
-Console.WriteLine($"API Key ID: {apiKeyId}");
-Console.WriteLine($"API Secret available: {!string.IsNullOrEmpty(apiSecret)}");
-
 // Add services to the container
 builder.Services.AddAuthorization();
 
