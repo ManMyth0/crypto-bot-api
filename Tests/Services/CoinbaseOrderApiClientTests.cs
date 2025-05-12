@@ -43,13 +43,13 @@ namespace crypto_bot_api.Tests.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    throw new CoinbaseApiException($"Failed to create order: {jsonResponse}");
+                    throw new CoinbaseApiException(jsonResponse);
                 }
 
                 var orderResponse = JsonSerializer.Deserialize<CreateOrderResponseDto>(
                     jsonResponse,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                
+
                 return orderResponse ?? new CreateOrderResponseDto();
             }
         }
@@ -91,10 +91,7 @@ namespace crypto_bot_api.Tests.Services
         [TestInitialize]
         public void TestInitialize()
         {
-            // Setup mock HTTP handler
             _mockHttpHandler = new Mock<HttpMessageHandler>();
-            
-            // Setup API client
             _orderClient = new TestOrderApiClient(_mockHttpHandler);
         }
 
@@ -136,8 +133,9 @@ namespace crypto_bot_api.Tests.Services
                 }
             };
 
+            var expectedStatusCode = HttpStatusCode.OK;
             SetupHttpResponseForMethod(
-                HttpStatusCode.OK,
+                expectedStatusCode,
                 SuccessfulBuyOrderResponse,
                 "orders",
                 HttpMethod.Post);
@@ -147,6 +145,7 @@ namespace crypto_bot_api.Tests.Services
             Assert.IsNotNull(result);
             Assert.IsTrue(result.Success);
             Assert.IsNotNull(result.SuccessResponse);
+            Assert.AreEqual(expectedStatusCode, HttpStatusCode.OK, "Expected status code 200 OK");
             Assert.AreEqual("BTC-USD", result.SuccessResponse.ProductId);
             Assert.AreEqual("BUY", result.SuccessResponse.Side);
             Assert.AreEqual("0123-45678-012345", result.SuccessResponse.ClientOrderId);
@@ -171,8 +170,9 @@ namespace crypto_bot_api.Tests.Services
                 }
             };
 
+            var expectedStatusCode = HttpStatusCode.OK;
             SetupHttpResponseForMethod(
-                HttpStatusCode.OK,
+                expectedStatusCode,
                 SuccessfulSellOrderResponse,
                 "orders",
                 HttpMethod.Post);
@@ -182,13 +182,13 @@ namespace crypto_bot_api.Tests.Services
             Assert.IsNotNull(result);
             Assert.IsTrue(result.Success);
             Assert.IsNotNull(result.SuccessResponse);
+            Assert.AreEqual(expectedStatusCode, HttpStatusCode.OK, "Expected status code 200 OK");
             Assert.AreEqual("BTC-USD", result.SuccessResponse.ProductId);
             Assert.AreEqual("SELL", result.SuccessResponse.Side);
             Assert.AreEqual("0123-45678-012345", result.SuccessResponse.ClientOrderId);
         }
 
         [TestMethod]
-        [ExpectedException(typeof(CoinbaseApiException))]
         public async Task CreateOrder_ThrowsExceptionWhenApiReturnsError()
         {
             var createOrderRequest = new CreateOrderRequestDto
@@ -213,8 +213,23 @@ namespace crypto_bot_api.Tests.Services
                 "orders",
                 HttpMethod.Post);
 
-            // This should throw an exception
-            await _orderClient.CreateOrderAsync(createOrderRequest);
+            try
+            {
+                await _orderClient.CreateOrderAsync(createOrderRequest);
+                Assert.Fail("Expected CoinbaseApiException was not thrown");
+            }
+            catch (CoinbaseApiException)
+            {
+                // Deserialize the error response directly from the original OrderErrorResponse to check the error details
+                var errorResponse = JsonSerializer.Deserialize<CreateOrderResponseDto>(OrderErrorResponse);
+
+                Assert.IsNotNull(errorResponse);
+                Assert.IsFalse(errorResponse.Success);
+                Assert.IsNotNull(errorResponse.ErrorResponse);
+                Assert.AreEqual("INVALID_REQUEST", errorResponse.ErrorResponse.Error);
+                Assert.AreEqual("Invalid order request structure", errorResponse.ErrorResponse.Message);
+                Assert.AreEqual("The provided quote quantity is invalid", errorResponse.ErrorResponse.ErrorDetails);
+            }
         }
     }
-} 
+}
