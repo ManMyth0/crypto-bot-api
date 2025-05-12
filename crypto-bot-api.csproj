@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>crypto_bot_api</RootNamespace>
     <UserSecretsId>ab45c2d5-7b64-4aae-b07f-425e741784ac</UserSecretsId>
+    <NoWarn>$(NoWarn);CS7022</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
