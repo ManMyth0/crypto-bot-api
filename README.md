@@ -89,6 +89,8 @@ The API will be available at `http://localhost:5294`.
 
 - C#
 - .NET 9.0
+- MSTest for unit testing
+- Moq for mocking in tests
 - Coinbase Advanced Trade API
 - PostgreSQL with Entity Framework Core 9.0.4
 - System.Text.Json for JSON serialization/deserialization
