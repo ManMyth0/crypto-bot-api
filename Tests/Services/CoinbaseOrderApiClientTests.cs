@@ -1,11 +1,10 @@
 using Moq;
 using System.Net;
-using System.Text;
-using Moq.Protected;
 using System.Text.Json;
 using crypto_bot_api.Services;
 using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Models.DTOs.Orders;
+using crypto_bot_api.Tests.Utilities;
 
 namespace crypto_bot_api.Tests.Services
 {
@@ -13,44 +12,24 @@ namespace crypto_bot_api.Tests.Services
     public class CoinbaseOrderApiClientTests
     {
         // Test class to avoid JWT signing issues
-        private class TestOrderApiClient : ICoinbaseOrderApiClient
+        private class TestOrderApiClient : TestApiClientBase, ICoinbaseOrderApiClient
         {
-            private readonly HttpClient _client;
-            private readonly Mock<HttpMessageHandler> _mockHandler;
-
-            public TestOrderApiClient(Mock<HttpMessageHandler> mockHandler)
+            public TestOrderApiClient(Mock<HttpMessageHandler> mockHandler) 
+                : base(mockHandler)
             {
-                _mockHandler = mockHandler;
-                _client = new HttpClient(mockHandler.Object)
-                {
-                    BaseAddress = new Uri("https://api.coinbase.com")
-                };
             }
 
             public async Task<CreateOrderResponseDto> CreateOrderAsync(CreateOrderRequestDto orderRequest)
             {
-                string endpoint = "/api/v3/brokerage/orders";
-                string fullUrl = $"https://api.coinbase.com{endpoint}";
+                return await SendRequestAsync<CreateOrderResponseDto>(
+                    HttpMethod.Post,
+                    "/api/v3/brokerage/orders",
+                    orderRequest);
+            }
 
-                var request = new HttpRequestMessage(HttpMethod.Post, fullUrl);
-                request.Content = new StringContent(
-                    JsonSerializer.Serialize(orderRequest),
-                    Encoding.UTF8,
-                    "application/json");
-
-                var response = await _client.SendAsync(request);
-                string jsonResponse = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new CoinbaseApiException(jsonResponse);
-                }
-
-                var orderResponse = JsonSerializer.Deserialize<CreateOrderResponseDto>(
-                    jsonResponse,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                return orderResponse ?? new CreateOrderResponseDto();
+            public new void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
+            {
+                base.SetupHttpResponseForMethod(statusCode, content, urlContains, method);
             }
         }
 
@@ -98,20 +77,7 @@ namespace crypto_bot_api.Tests.Services
         // Helper methods
         private void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
         {
-            _mockHttpHandler
-                .Protected()
-                .Setup<Task<HttpResponseMessage>>(
-                    "SendAsync",
-                    ItExpr.Is<HttpRequestMessage>(req =>
-                        req.Method == method &&
-                        req.RequestUri != null &&
-                        req.RequestUri.ToString().Contains(urlContains)),
-                    ItExpr.IsAny<CancellationToken>())
-                .ReturnsAsync(new HttpResponseMessage
-                {
-                    StatusCode = statusCode,
-                    Content = new StringContent(content, Encoding.UTF8, "application/json")
-                });
+            ((TestOrderApiClient)_orderClient).SetupHttpResponseForMethod(statusCode, content, urlContains, method);
         }
 
         [TestMethod]
@@ -142,13 +108,8 @@ namespace crypto_bot_api.Tests.Services
 
             var result = await _orderClient.CreateOrderAsync(createOrderRequest);
 
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Success);
-            Assert.IsNotNull(result.SuccessResponse);
-            Assert.AreEqual(expectedStatusCode, HttpStatusCode.OK, "Expected status code 200 OK");
-            Assert.AreEqual("BTC-USD", result.SuccessResponse.ProductId);
-            Assert.AreEqual("BUY", result.SuccessResponse.Side);
-            Assert.AreEqual("0123-45678-012345", result.SuccessResponse.ClientOrderId);
+            CoinbaseApiTestAssertions.AssertSuccessfulResponse(result, expectedStatusCode);
+            CoinbaseApiTestAssertions.AssertOrderResponse(result, "BTC-USD", "BUY", "0123-45678-012345");
         }
 
         [TestMethod]
@@ -179,13 +140,8 @@ namespace crypto_bot_api.Tests.Services
 
             var result = await _orderClient.CreateOrderAsync(createOrderRequest);
 
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Success);
-            Assert.IsNotNull(result.SuccessResponse);
-            Assert.AreEqual(expectedStatusCode, HttpStatusCode.OK, "Expected status code 200 OK");
-            Assert.AreEqual("BTC-USD", result.SuccessResponse.ProductId);
-            Assert.AreEqual("SELL", result.SuccessResponse.Side);
-            Assert.AreEqual("0123-45678-012345", result.SuccessResponse.ClientOrderId);
+            CoinbaseApiTestAssertions.AssertSuccessfulResponse(result, expectedStatusCode);
+            CoinbaseApiTestAssertions.AssertOrderResponse(result, "BTC-USD", "SELL", "0123-45678-012345");
         }
 
         [TestMethod]
@@ -222,13 +178,11 @@ namespace crypto_bot_api.Tests.Services
             {
                 // Deserialize the error response directly from the original OrderErrorResponse to check the error details
                 var errorResponse = JsonSerializer.Deserialize<CreateOrderResponseDto>(OrderErrorResponse);
-
-                Assert.IsNotNull(errorResponse);
-                Assert.IsFalse(errorResponse.Success);
-                Assert.IsNotNull(errorResponse.ErrorResponse);
-                Assert.AreEqual("INVALID_REQUEST", errorResponse.ErrorResponse.Error);
-                Assert.AreEqual("Invalid order request structure", errorResponse.ErrorResponse.Message);
-                Assert.AreEqual("The provided quote quantity is invalid", errorResponse.ErrorResponse.ErrorDetails);
+                CoinbaseApiTestAssertions.AssertOrderErrorResponse(
+                    errorResponse!,
+                    "INVALID_REQUEST",
+                    "Invalid order request structure",
+                    "The provided quote quantity is invalid");
             }
         }
     }

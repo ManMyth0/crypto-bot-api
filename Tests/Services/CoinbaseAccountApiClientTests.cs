@@ -1,13 +1,9 @@
 using Moq;
 using System.Net;
-using System.Text;
-using Moq.Protected;
-using System.Text.Json;
 using crypto_bot_api.Services;
-using crypto_bot_api.CustomExceptions;
-using crypto_bot_api.Models.DTOs.Orders;
 using crypto_bot_api.Models.DTOs;
-using Microsoft.Extensions.Configuration;
+using crypto_bot_api.Tests.Utilities;
+using crypto_bot_api.CustomExceptions;
 
 namespace crypto_bot_api.Tests.Services
 {
@@ -71,20 +67,7 @@ namespace crypto_bot_api.Tests.Services
 
         private void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
         {
-            _mockHttpHandler
-                .Protected()
-                .Setup<Task<HttpResponseMessage>>(
-                    "SendAsync",
-                    ItExpr.Is<HttpRequestMessage>(req =>
-                        req.Method == method &&
-                        req.RequestUri != null &&
-                        req.RequestUri.ToString().Contains(urlContains)),
-                    ItExpr.IsAny<CancellationToken>())
-                .ReturnsAsync(new HttpResponseMessage
-                {
-                    StatusCode = statusCode,
-                    Content = new StringContent(content, Encoding.UTF8, "application/json")
-                });
+            ((TestAccountApiClient)_accountClient).SetupHttpResponseForMethod(statusCode, content, urlContains, method);
         }
 
         [TestMethod]
@@ -99,10 +82,9 @@ namespace crypto_bot_api.Tests.Services
 
             var result = await _accountClient.GetAccountsAsync();
 
-            Assert.IsNotNull(result);
+            CoinbaseApiTestAssertions.AssertSuccessfulResponse(result, expectedStatusCode);
             Assert.IsNotNull(result.Accounts);
             Assert.AreEqual(2, result.Accounts.Count);
-            Assert.AreEqual(expectedStatusCode, HttpStatusCode.OK, "Expected status code 200 OK");
             
             // First account assertions
             Assert.AreEqual("12345678-1234-1234-1234-123456789012", result.Accounts[0].Uuid);
@@ -128,12 +110,8 @@ namespace crypto_bot_api.Tests.Services
 
             var result = await _accountClient.GetAccountByUuidAsync(accountUuid);
 
-            Assert.IsNotNull(result);
-            Assert.IsNotNull(result.Account);
-            Assert.AreEqual(expectedStatusCode, HttpStatusCode.OK, "Expected status code 200 OK");
-            Assert.AreEqual(accountUuid, result.Account.Uuid);
-            Assert.AreEqual("BTC Wallet", result.Account.Name);
-            Assert.AreEqual("0.1", result.Account.AvailableBalance?.Value);
+            CoinbaseApiTestAssertions.AssertSuccessfulResponse(result, expectedStatusCode);
+            CoinbaseApiTestAssertions.AssertAccountDetails(result, accountUuid, "BTC Wallet", "0.1");
         }
 
         [TestMethod]
@@ -152,10 +130,7 @@ namespace crypto_bot_api.Tests.Services
             }
             catch (CoinbaseApiException ex)
             {
-                var errorResponse = JsonSerializer.Deserialize<ErrorResponseDto>(ex.Message);
-                Assert.IsNotNull(errorResponse);
-                Assert.AreEqual("INVALID_REQUEST", errorResponse.Error);
-                Assert.AreEqual("Invalid request parameters", errorResponse.Message);
+                CoinbaseApiTestAssertions.AssertErrorResponse(ex.Message, "INVALID_REQUEST", "Invalid request parameters");
             }
         }
 
@@ -176,65 +151,29 @@ namespace crypto_bot_api.Tests.Services
             }
             catch (CoinbaseApiException ex)
             {
-                var errorResponse = JsonSerializer.Deserialize<ErrorResponseDto>(ex.Message);
-                Assert.IsNotNull(errorResponse);
-                Assert.AreEqual("INVALID_REQUEST", errorResponse.Error);
-                Assert.AreEqual("Invalid request parameters", errorResponse.Message);
+                CoinbaseApiTestAssertions.AssertErrorResponse(ex.Message, "INVALID_REQUEST", "Invalid request parameters");
             }
         }
 
-        private class TestAccountApiClient : ICoinbaseAccountApiClient
+        private class TestAccountApiClient : TestApiClientBase, ICoinbaseAccountApiClient
         {
-            private readonly HttpClient _client;
-            private readonly Mock<HttpMessageHandler> _mockHandler;
-
-            public TestAccountApiClient(Mock<HttpMessageHandler> mockHandler)
+            public TestAccountApiClient(Mock<HttpMessageHandler> mockHandler) 
+                : base(mockHandler)
             {
-                _mockHandler = mockHandler;
-                _client = new HttpClient(mockHandler.Object)
-                {
-                    BaseAddress = new Uri("https://api.coinbase.com")
-                };
             }
 
             public async Task<AccountsResponseDto> GetAccountsAsync()
             {
-                string endpoint = "/api/v3/brokerage/accounts";
-                string fullUrl = $"https://api.coinbase.com{endpoint}";
-
-                var request = new HttpRequestMessage(HttpMethod.Get, fullUrl);
-                var response = await _client.SendAsync(request);
-                string jsonResponse = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new CoinbaseApiException(jsonResponse);
-                }
-
-                return JsonSerializer.Deserialize<AccountsResponseDto>(
-                    jsonResponse,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) 
-                    ?? new AccountsResponseDto();
+                return await SendRequestAsync<AccountsResponseDto>(
+                    HttpMethod.Get,
+                    "/api/v3/brokerage/accounts");
             }
 
             public async Task<AccountDetailResponseDto> GetAccountByUuidAsync(string account_uuid)
             {
-                string endpoint = $"/api/v3/brokerage/accounts/{account_uuid}";
-                string fullUrl = $"https://api.coinbase.com{endpoint}";
-
-                var request = new HttpRequestMessage(HttpMethod.Get, fullUrl);
-                var response = await _client.SendAsync(request);
-                string jsonResponse = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new CoinbaseApiException(jsonResponse);
-                }
-
-                return JsonSerializer.Deserialize<AccountDetailResponseDto>(
-                    jsonResponse,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                    ?? new AccountDetailResponseDto();
+                return await SendRequestAsync<AccountDetailResponseDto>(
+                    HttpMethod.Get,
+                    $"/api/v3/brokerage/accounts/{account_uuid}");
             }
 
             public async Task<AccountDetailResponseDto?> GetAccountDetailsAsync()
@@ -258,6 +197,11 @@ namespace crypto_bot_api.Tests.Services
                     }
                 }            
                 throw new CoinbaseApiException("No account with a positive balance could be found.");
+            }
+
+            public new void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
+            {
+                base.SetupHttpResponseForMethod(statusCode, content, urlContains, method);
             }
         }
     }
