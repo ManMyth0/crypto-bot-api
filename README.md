@@ -59,18 +59,19 @@ The API will be available at `http://localhost:5294`.
 ### Account Endpoints
 - `GET /api/CoinbaseAccount/config` - View the current configuration (for debugging)
 - `GET /api/CoinbaseAccount/accounts` - Get all Coinbase accounts
-- `GET /api/CoinbaseAccount/account/{accountId}` - Get details for a specific account
 - `GET /api/CoinbaseAccount/account-details` - Get details for an account with a positive balance
+- `GET /api/CoinbaseAccount/account/{accountId}` - Get details for a specific account
 
 ### Order Endpoints
 - `POST /api/CoinbaseOrder/orders` - Create an order (buy or sell) by specifying the "side" property in the request body
+- `GET /api/CoinbaseOrder/historical/fills` - Get historical fill information for orders with optional filtering
 
 ## Order Request Format
 ```json
 {
     "product_id": "BTC-USD",
     "side": "BUY",  // or "SELL"
-    "client_order_id": "optional-unique-id", // Will be auto-generated if not provided
+    "client_order_id": "optional-unique-id", // Auto-generated through the GenerateCoinbaseClientOrderId Utility
     "order_configuration": {
         "limit_limit_gtc": {
             "base_size": "0.001",

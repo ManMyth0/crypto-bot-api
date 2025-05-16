@@ -1,8 +1,8 @@
 using System.Net.Mime;
 using crypto_bot_api.Services;
 using Microsoft.AspNetCore.Mvc;
-using crypto_bot_api.Models.DTOs;
 using crypto_bot_api.CustomExceptions;
+using System.Text.Json.Nodes;
 
 namespace crypto_bot_api.Controllers
 {
@@ -20,7 +20,7 @@ namespace crypto_bot_api.Controllers
         }
 
         [HttpGet("accounts")]
-        public async Task<ActionResult<AccountsResponseDto>> GetAccounts()
+        public async Task<ActionResult<JsonObject>> GetAccounts()
         {
             try
             {
@@ -38,15 +38,11 @@ namespace crypto_bot_api.Controllers
         }
 
         [HttpGet("account-details")]
-        public async Task<ActionResult<AccountDetailResponseDto>> GetAccountDetails()
+        public async Task<ActionResult<JsonObject>> GetAccountDetails()
         {
             try
             {
                 var result = await _coinbaseClient.GetAccountDetailsAsync();
-                if (result == null)
-                {
-                    return NotFound(new { error = "No account found with positive balance" });
-                }
                 return result;
             }
             catch (CoinbaseApiException ex)
@@ -60,7 +56,7 @@ namespace crypto_bot_api.Controllers
         }
 
         [HttpGet("account/{accountId}")]
-        public async Task<ActionResult<AccountDetailResponseDto>> GetAccountById(string accountId)
+        public async Task<ActionResult<JsonObject>> GetAccountById(string accountId)
         {
             try
             {

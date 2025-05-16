@@ -1,6 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using crypto_bot_api.Helpers;
-using crypto_bot_api.Models.DTOs;
 using crypto_bot_api.CustomExceptions;
 using Microsoft.Extensions.Configuration;
 
@@ -18,7 +18,7 @@ namespace crypto_bot_api.Services
         }
 
         // Retrieves all Coinbase accounts
-        public async Task<AccountsResponseDto> GetAccountsAsync()
+        public async Task<JsonObject> GetAccountsAsync()
         {
             string endpoint = "/api/v3/brokerage/accounts";
             string uri = $"GET {endpoint}";
@@ -27,12 +27,11 @@ namespace crypto_bot_api.Services
             var jwt = _jwtHelper.GenerateJwt(uri);
 
             string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, "Failed to retrieve accounts.");
-            return JsonSerializer.Deserialize<AccountsResponseDto>(jsonResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) 
-                ?? new AccountsResponseDto();
+            return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();
         }
 
         // Retrieves details for a specific account.
-        public async Task<AccountDetailResponseDto> GetAccountByUuidAsync(string account_uuid)
+        public async Task<JsonObject> GetAccountByUuidAsync(string account_uuid)
         {
             string endpoint = $"/api/v3/brokerage/accounts/{account_uuid}";
             string uri = $"GET {endpoint}";
@@ -41,29 +40,34 @@ namespace crypto_bot_api.Services
             var jwt = _jwtHelper.GenerateJwt(uri);
 
             string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, $"Failed to retrieve account details for {account_uuid}.");
-            return JsonSerializer.Deserialize<AccountDetailResponseDto>(jsonResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                ?? new AccountDetailResponseDto();
+            return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();
         }
 
-        public async Task<AccountDetailResponseDto?> GetAccountDetailsAsync()
+        public async Task<JsonObject> GetAccountDetailsAsync()
         {
             // Get all accounts
             var accountsResponse = await GetAccountsAsync();
             
-            if (accountsResponse.Accounts != null && accountsResponse.Accounts.Count > 0)
+            if (accountsResponse["accounts"] is JsonArray accountsArray && accountsArray.Count > 0)
             {
                 // Iterate through accounts to find one with balance > 0
-                foreach (var account in accountsResponse.Accounts)
+                foreach (var accountNode in accountsArray)
                 {
-                    if (account.AvailableBalance != null && 
-                        !string.IsNullOrEmpty(account.AvailableBalance.Value) &&
-                        decimal.TryParse(account.AvailableBalance.Value, out decimal balanceAmount) && 
-                        balanceAmount > 0)
+                    if (accountNode is JsonObject account)
                     {
-                        // Found an account with balance > 0, get its details
-                        if (!string.IsNullOrEmpty(account.Uuid))
+                        var availableBalance = account["available_balance"]?.AsObject();
+                        string? balanceValue = availableBalance?["value"]?.GetValue<string>();
+                        
+                        if (!string.IsNullOrEmpty(balanceValue) &&
+                            decimal.TryParse(balanceValue, out decimal balanceAmount) && 
+                            balanceAmount > 0)
                         {
-                            return await GetAccountByUuidAsync(account.Uuid);
+                            // Found an account with balance > 0, get its details
+                            string? uuid = account["uuid"]?.GetValue<string>();
+                            if (!string.IsNullOrEmpty(uuid))
+                            {
+                                return await GetAccountByUuidAsync(uuid);
+                            }
                         }
                     }
                 }

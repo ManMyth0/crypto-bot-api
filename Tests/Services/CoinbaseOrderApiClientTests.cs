@@ -1,6 +1,7 @@
 using Moq;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using crypto_bot_api.Services;
 using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Models.DTOs.Orders;
@@ -19,12 +20,18 @@ namespace crypto_bot_api.Tests.Services
             {
             }
 
-            public async Task<CreateOrderResponseDto> CreateOrderAsync(CreateOrderRequestDto orderRequest)
+            public async Task<JsonObject> CreateOrderAsync(CreateOrderRequestDto orderRequest)
             {
-                return await SendRequestAsync<CreateOrderResponseDto>(
+                return await SendRequestAsync<JsonObject>(
                     HttpMethod.Post,
                     "/api/v3/brokerage/orders",
                     orderRequest);
+            }
+
+            public async Task<JsonObject> ListOrderFillsAsync(ListOrderFillsRequestDto fillsRequest)
+            {
+                // Implementation needed for interface but not used in these tests
+                return await Task.FromResult(JsonNode.Parse("{}") as JsonObject ?? new JsonObject());
             }
 
             public new void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
@@ -108,10 +115,14 @@ namespace crypto_bot_api.Tests.Services
 
             var result = await _orderClient.CreateOrderAsync(createOrderRequest);
 
-            CoinbaseApiTestAssertions.AssertSuccessfulResponse(result, expectedStatusCode);
-            CoinbaseApiTestAssertions.AssertOrderResponse(result, "BTC-USD", "BUY", "0123-45678-012345");
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result["success"]?.GetValue<bool>() ?? false);
+            Assert.IsNotNull(result["success_response"]);
+            Assert.AreEqual("BTC-USD", result["success_response"]?["product_id"]?.GetValue<string>());
+            Assert.AreEqual("BUY", result["success_response"]?["side"]?.GetValue<string>());
+            Assert.AreEqual("0123-45678-012345", result["success_response"]?["client_order_id"]?.GetValue<string>());
         }
-
+        
         [TestMethod]
         public async Task CreateSellOrder_ReturnsOrderDetailsWhenSuccessful()
         {
@@ -140,8 +151,12 @@ namespace crypto_bot_api.Tests.Services
 
             var result = await _orderClient.CreateOrderAsync(createOrderRequest);
 
-            CoinbaseApiTestAssertions.AssertSuccessfulResponse(result, expectedStatusCode);
-            CoinbaseApiTestAssertions.AssertOrderResponse(result, "BTC-USD", "SELL", "0123-45678-012345");
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result["success"]?.GetValue<bool>() ?? false);
+            Assert.IsNotNull(result["success_response"]);
+            Assert.AreEqual("BTC-USD", result["success_response"]?["product_id"]?.GetValue<string>());
+            Assert.AreEqual("SELL", result["success_response"]?["side"]?.GetValue<string>());
+            Assert.AreEqual("0123-45678-012345", result["success_response"]?["client_order_id"]?.GetValue<string>());
         }
 
         [TestMethod]
@@ -176,13 +191,13 @@ namespace crypto_bot_api.Tests.Services
             }
             catch (CoinbaseApiException)
             {
-                // Deserialize the error response directly from the original OrderErrorResponse to check the error details
-                var errorResponse = JsonSerializer.Deserialize<CreateOrderResponseDto>(OrderErrorResponse);
-                CoinbaseApiTestAssertions.AssertOrderErrorResponse(
-                    errorResponse!,
-                    "INVALID_REQUEST",
-                    "Invalid order request structure",
-                    "The provided quote quantity is invalid");
+                // Parse the error response directly
+                var errorResponse = JsonSerializer.Deserialize<JsonObject>(OrderErrorResponse);
+                Assert.IsNotNull(errorResponse);
+                Assert.IsFalse(errorResponse["success"]?.GetValue<bool>() ?? true);
+                Assert.AreEqual("INVALID_REQUEST", errorResponse["error_response"]?["error"]?.GetValue<string>());
+                Assert.AreEqual("Invalid order request structure", errorResponse["error_response"]?["message"]?.GetValue<string>());
+                Assert.AreEqual("The provided quote quantity is invalid", errorResponse["error_response"]?["error_details"]?.GetValue<string>());
             }
         }
     }

@@ -1,11 +1,11 @@
-using crypto_bot_api.Models.DTOs;
+using System.Text.Json.Nodes;
 
 namespace crypto_bot_api.Services
 {
     public interface ICoinbaseAccountApiClient
     {
-        Task<AccountsResponseDto> GetAccountsAsync();
-        Task<AccountDetailResponseDto?> GetAccountDetailsAsync();
-        Task<AccountDetailResponseDto> GetAccountByUuidAsync(string account_uuid);
+        Task<JsonObject> GetAccountsAsync();
+        Task<JsonObject> GetAccountDetailsAsync();
+        Task<JsonObject> GetAccountByUuidAsync(string account_uuid);
     }
 } 
