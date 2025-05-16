@@ -33,8 +33,38 @@ namespace crypto_bot_api.Tests.Services
                 if (!string.IsNullOrEmpty(fillsRequest.OrderId))
                     queryParams.Add($"order_id={fillsRequest.OrderId}");
                     
+                // Handle order_ids array
+                if (fillsRequest.OrderIds?.Length > 0)
+                {
+                    foreach (var orderId in fillsRequest.OrderIds)
+                    {
+                        if (!string.IsNullOrEmpty(orderId))
+                            queryParams.Add($"order_ids={Uri.EscapeDataString(orderId)}");
+                    }
+                }
+                
+                // Handle trade_ids array
+                if (fillsRequest.TradeIds?.Length > 0)
+                {
+                    foreach (var tradeId in fillsRequest.TradeIds)
+                    {
+                        if (!string.IsNullOrEmpty(tradeId))
+                            queryParams.Add($"trade_ids={Uri.EscapeDataString(tradeId)}");
+                    }
+                }
+                
                 if (!string.IsNullOrEmpty(fillsRequest.ProductId))
                     queryParams.Add($"product_id={fillsRequest.ProductId}");
+                
+                // Handle product_ids array    
+                if (fillsRequest.ProductIds?.Length > 0)
+                {
+                    foreach (var productId in fillsRequest.ProductIds)
+                    {
+                        if (!string.IsNullOrEmpty(productId))
+                            queryParams.Add($"product_ids={Uri.EscapeDataString(productId)}");
+                    }
+                }
                     
                 if (!string.IsNullOrEmpty(fillsRequest.StartSequenceTimestamp))
                     queryParams.Add($"start_sequence_timestamp={fillsRequest.StartSequenceTimestamp}");
@@ -47,6 +77,9 @@ namespace crypto_bot_api.Tests.Services
                     
                 if (!string.IsNullOrEmpty(fillsRequest.Cursor))
                     queryParams.Add($"cursor={fillsRequest.Cursor}");
+                
+                if (!string.IsNullOrEmpty(fillsRequest.SortBy))
+                    queryParams.Add($"sort_by={fillsRequest.SortBy}");
                     
                 string queryString = queryParams.Count > 0 ? $"?{string.Join("&", queryParams)}" : string.Empty;
                 
@@ -115,6 +148,7 @@ namespace crypto_bot_api.Tests.Services
             {
                 OrderId = "b947374d-5178-43a0-81f9-2dc0b58cca15",
                 ProductId = "BTC-USD"
+                // Limit defaults to 50
             };
 
             var expectedStatusCode = HttpStatusCode.OK;
@@ -173,18 +207,19 @@ namespace crypto_bot_api.Tests.Services
         {
             var fillsRequest = new ListOrderFillsRequestDto
             {
-                OrderId = "b947374d-5178-43a0-81f9-2dc0b58cca15",
-                ProductId = "BTC-USD",
+                OrderIds = new[] { "order-1", "order-2" },
+                ProductIds = new[] { "BTC-USD", "ETH-USD" },
                 StartSequenceTimestamp = "2023-05-30T00:00:00Z",
                 EndSequenceTimestamp = "2023-05-31T23:59:59Z",
-                Limit = 50
+                SortBy = "created_time",
+                // Limit is already defaulted to 50
             };
 
             var expectedStatusCode = HttpStatusCode.OK;
             SetupHttpResponseForMethod(
                 expectedStatusCode,
                 SuccessfulOrderFillsResponse,
-                "historical/fills?order_id=b947374d-5178-43a0-81f9-2dc0b58cca15&product_id=BTC-USD&start_sequence_timestamp=2023-05-30T00:00:00Z&end_sequence_timestamp=2023-05-31T23:59:59Z&limit=50",
+                "historical/fills",
                 HttpMethod.Get);
 
             var result = await _orderClient.ListOrderFillsAsync(fillsRequest);
@@ -216,6 +251,28 @@ namespace crypto_bot_api.Tests.Services
             {
                 Assert.IsTrue(ex.Message.Contains("Invalid order ID format"));
             }
+        }
+
+        [TestMethod]
+        public async Task ListOrderFills_DefaultsLimitTo50()
+        {
+            var fillsRequest = new ListOrderFillsRequestDto
+            {
+                ProductId = "BTC-USD"
+                // Not setting Limit, should default to 50
+            };
+
+            var expectedStatusCode = HttpStatusCode.OK;
+            SetupHttpResponseForMethod(
+                expectedStatusCode,
+                SuccessfulOrderFillsResponse,
+                "limit=50",
+                HttpMethod.Get);
+
+            var result = await _orderClient.ListOrderFillsAsync(fillsRequest);
+            
+            Assert.IsNotNull(result);
+            Assert.IsNotNull(result["fills"]);
         }
     }
 } 

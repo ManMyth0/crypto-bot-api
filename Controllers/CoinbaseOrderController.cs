@@ -38,22 +38,30 @@ namespace crypto_bot_api.Controllers
         [HttpGet("historical/fills")]
         public async Task<ActionResult<JsonObject>> GetOrderFills(
             [FromQuery] string? orderId = null,
+            [FromQuery(Name = "order_ids")] string[]? orderIds = null,
+            [FromQuery(Name = "trade_ids")] string[]? tradeIds = null,
             [FromQuery] string? productId = null,
+            [FromQuery(Name = "product_ids")] string[]? productIds = null,
             [FromQuery] string? startSequenceTimestamp = null,
             [FromQuery] string? endSequenceTimestamp = null,
-            [FromQuery] int? limit = null,
-            [FromQuery] string? cursor = null)
+            [FromQuery] int? limit = 50,
+            [FromQuery] string? cursor = null,
+            [FromQuery] string? sortBy = null)
         {
             try
             {
                 var fillsRequest = new ListOrderFillsRequestDto
                 {
                     OrderId = orderId,
+                    OrderIds = orderIds,
+                    TradeIds = tradeIds,
                     ProductId = productId,
+                    ProductIds = productIds,
                     StartSequenceTimestamp = startSequenceTimestamp,
                     EndSequenceTimestamp = endSequenceTimestamp,
                     Limit = limit,
-                    Cursor = cursor
+                    Cursor = cursor,
+                    SortBy = sortBy
                 };
 
                 var result = await _coinbaseOrderClient.ListOrderFillsAsync(fillsRequest);
