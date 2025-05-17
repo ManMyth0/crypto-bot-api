@@ -88,6 +88,12 @@ namespace crypto_bot_api.Tests.Services
                     $"/api/v3/brokerage/orders/historical/fills{queryString}");
             }
 
+            public async Task<JsonObject> ListOrdersAsync(ListOrdersRequestDto ordersRequest)
+            {
+                // Implementation needed for interface but not used in these fills-focused tests
+                return await Task.FromResult(JsonNode.Parse("{}") as JsonObject ?? new JsonObject());
+            }
+
             public new void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
             {
                 base.SetupHttpResponseForMethod(statusCode, content, urlContains, method);

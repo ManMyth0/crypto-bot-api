@@ -1,10 +1,10 @@
+using System.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using crypto_bot_api.Helpers;
 using crypto_bot_api.Utilities;
 using crypto_bot_api.Models.DTOs.Orders;
 using Microsoft.Extensions.Configuration;
-using System.Web;
 
 namespace crypto_bot_api.Services
 {
@@ -104,6 +104,111 @@ namespace crypto_bot_api.Services
             var jwt = _jwtHelper.GenerateJwt(uri);
             
             string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, "Failed to retrieve order fills.");
+            return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();
+        }
+
+        public async Task<JsonObject> ListOrdersAsync(ListOrdersRequestDto ordersRequest)
+        {
+            var query = HttpUtility.ParseQueryString(string.Empty);
+            
+            // Handle order_ids array
+            if (ordersRequest.OrderIds?.Length > 0)
+            {
+                foreach (var orderId in ordersRequest.OrderIds)
+                {
+                    if (!string.IsNullOrEmpty(orderId))
+                        query.Add("order_ids", orderId);
+                }
+            }
+            
+            // Handle product_ids array
+            if (ordersRequest.ProductIds?.Length > 0)
+            {
+                foreach (var productId in ordersRequest.ProductIds)
+                {
+                    if (!string.IsNullOrEmpty(productId))
+                        query.Add("product_ids", productId);
+                }
+            }
+            
+            if (!string.IsNullOrEmpty(ordersRequest.ProductType))
+                query["product_type"] = ordersRequest.ProductType;
+            
+            // Handle order_status array
+            if (ordersRequest.OrderStatus?.Length > 0)
+            {
+                foreach (var status in ordersRequest.OrderStatus)
+                {
+                    if (!string.IsNullOrEmpty(status))
+                        query.Add("order_status", status);
+                }
+            }
+            
+            // Handle time_in_forces array
+            if (ordersRequest.TimeInForces?.Length > 0)
+            {
+                foreach (var timeInForce in ordersRequest.TimeInForces)
+                {
+                    if (!string.IsNullOrEmpty(timeInForce))
+                        query.Add("time_in_forces", timeInForce);
+                }
+            }
+            
+            // Handle order_types array
+            if (ordersRequest.OrderTypes?.Length > 0)
+            {
+                foreach (var orderType in ordersRequest.OrderTypes)
+                {
+                    if (!string.IsNullOrEmpty(orderType))
+                        query.Add("order_types", orderType);
+                }
+            }
+            
+            if (!string.IsNullOrEmpty(ordersRequest.OrderSide))
+                query["order_side"] = ordersRequest.OrderSide;
+            
+            if (!string.IsNullOrEmpty(ordersRequest.StartDate))
+                query["start_date"] = ordersRequest.StartDate;
+            
+            if (!string.IsNullOrEmpty(ordersRequest.EndDate))
+                query["end_date"] = ordersRequest.EndDate;
+            
+            if (!string.IsNullOrEmpty(ordersRequest.OrderPlacementSource))
+                query["order_placement_source"] = ordersRequest.OrderPlacementSource;
+            
+            if (!string.IsNullOrEmpty(ordersRequest.ContractExpiryType))
+                query["contract_expiry_type"] = ordersRequest.ContractExpiryType;
+            
+            // Handle asset_filters array
+            if (ordersRequest.AssetFilters?.Length > 0)
+            {
+                foreach (var assetFilter in ordersRequest.AssetFilters)
+                {
+                    if (!string.IsNullOrEmpty(assetFilter))
+                        query.Add("asset_filters", assetFilter);
+                }
+            }
+            
+            if (!string.IsNullOrEmpty(ordersRequest.RetailPortfolioId))
+                query["retail_portfolio_id"] = ordersRequest.RetailPortfolioId;
+            
+            if (ordersRequest.Limit.HasValue)
+                query["limit"] = ordersRequest.Limit.Value.ToString();
+            
+            if (!string.IsNullOrEmpty(ordersRequest.Cursor))
+                query["cursor"] = ordersRequest.Cursor;
+            
+            if (!string.IsNullOrEmpty(ordersRequest.SortBy))
+                query["sort_by"] = ordersRequest.SortBy;
+            
+            string queryString = query.Count > 0 ? $"?{query}" : string.Empty;
+            string endpoint = $"/api/v3/brokerage/orders/historical/batch{queryString}";
+            string uri = $"GET {endpoint}";
+            string fullUrl = $"{_baseUrl.TrimEnd('/')}{endpoint}";
+            
+            var jwt = _jwtHelper.GenerateJwt(uri);
+            
+            string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, "Failed to retrieve orders.");
             return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();
         }
     }

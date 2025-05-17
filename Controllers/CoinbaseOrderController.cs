@@ -76,5 +76,59 @@ namespace crypto_bot_api.Controllers
                 return StatusCode(500, new { error = ex.Message });
             }
         }
+
+        [HttpGet("historical/batch")]
+        public async Task<ActionResult<JsonObject>> GetOrders(
+            [FromQuery(Name = "order_ids")] string[]? orderIds = null,
+            [FromQuery(Name = "product_ids")] string[]? productIds = null,
+            [FromQuery] string? productType = null,
+            [FromQuery(Name = "order_status")] string[]? orderStatus = null,
+            [FromQuery(Name = "time_in_forces")] string[]? timeInForces = null,
+            [FromQuery(Name = "order_types")] string[]? orderTypes = null,
+            [FromQuery] string? orderSide = null,
+            [FromQuery] string? startDate = null,
+            [FromQuery] string? endDate = null,
+            [FromQuery] string? orderPlacementSource = null,
+            [FromQuery] string? contractExpiryType = null,
+            [FromQuery(Name = "asset_filters")] string[]? assetFilters = null,
+            [FromQuery] string? retailPortfolioId = null,
+            [FromQuery] int? limit = 50,
+            [FromQuery] string? cursor = null,
+            [FromQuery] string? sortBy = null)
+        {
+            try
+            {
+                var ordersRequest = new ListOrdersRequestDto
+                {
+                    OrderIds = orderIds,
+                    ProductIds = productIds,
+                    ProductType = productType,
+                    OrderStatus = orderStatus,
+                    TimeInForces = timeInForces,
+                    OrderTypes = orderTypes,
+                    OrderSide = orderSide,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    OrderPlacementSource = orderPlacementSource,
+                    ContractExpiryType = contractExpiryType,
+                    AssetFilters = assetFilters,
+                    RetailPortfolioId = retailPortfolioId,
+                    Limit = limit,
+                    Cursor = cursor,
+                    SortBy = sortBy
+                };
+
+                var result = await _coinbaseOrderClient.ListOrdersAsync(ordersRequest);
+                return result;
+            }
+            catch (CoinbaseApiException ex)
+            {
+                return StatusCode(502, new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
     }
 } 
