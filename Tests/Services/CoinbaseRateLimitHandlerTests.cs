@@ -21,12 +21,12 @@ namespace crypto_bot_api.Tests.Services
         [TestInitialize]
         public void TestInitialize()
         {
-            // Set up options
+            // Set up options with new values
             _options = new RateLimitOptions
             {
-                PublicEndpointRateLimit = 8,
-                PrivateEndpointRateLimit = 29,
-                LastRemainingPrivateRequests = 29
+                PublicEndpointRateLimit = 9,
+                PrivateEndpointRateLimit = 30,
+                LastRemainingPrivateRequests = 30
             };
             
             _mockOptions = new Mock<IOptions<RateLimitOptions>>();
@@ -67,7 +67,10 @@ namespace crypto_bot_api.Tests.Services
                     $"Request {i+1} took {elapsed.TotalMilliseconds}ms which is longer than expected");
             }
             
-            // The next request should be delayed
+            // Verify no logs were produced during normal operation
+            VerifyNoLogsProduced();
+            
+            // The next request should be delayed since we've hit our self-imposed limit
             var finalStartTime = DateTime.UtcNow;
             await _invoker.SendAsync(CreatePublicRequest(), CancellationToken.None);
             var finalElapsed = DateTime.UtcNow - finalStartTime;
@@ -78,13 +81,16 @@ namespace crypto_bot_api.Tests.Services
             
             // Verify count of requests in queue
             Assert.AreEqual(maxRequests + 1, _options.RecentPublicRequests.Count);
+            
+            // Still verify no logs were produced (even when self-throttling, but not exceeding external limits)
+            VerifyNoLogsProduced();
         }
         
         [TestMethod]
-        public async Task PrivateEndpoint_ThrottlesWhenNearingLimit()
+        public async Task PrivateEndpoint_ProactivelyThrottlesWhenNearingLimit()
         {
             // Arrange
-            SetupMockResponse(HttpStatusCode.OK, remainingRequests: 29);
+            SetupMockResponse(HttpStatusCode.OK, remainingRequests: 30);
             
             // Act & Assert
             // First request with high remaining count - should be fast
@@ -95,17 +101,24 @@ namespace crypto_bot_api.Tests.Services
             // Should be quick (< 50ms)
             Assert.IsTrue(elapsed.TotalMilliseconds < 50);
             
-            // Now set remaining requests to 1 to trigger throttling
+            // Verify no logs for normal operation
+            VerifyNoLogsProduced();
+            
+            // Now set remaining requests to 1 to trigger proactive throttling
+            // This simulates when we're about to hit the limit but haven't yet
             _options.LastRemainingPrivateRequests = 1;
             
-            // Second request should be delayed
+            // Second request should be proactively delayed to avoid hitting limits
             startTime = DateTime.UtcNow;
             await _invoker.SendAsync(CreatePrivateRequest(), CancellationToken.None);
             elapsed = DateTime.UtcNow - startTime;
             
-            // Should have delay (at least 80ms due to the 100ms delay applied)
+            // Should have delay (at least 80ms due to the 100ms proactive delay applied)
             Assert.IsTrue(elapsed.TotalMilliseconds >= 80,
-                $"Expected delay for low remaining requests, but only took {elapsed.TotalMilliseconds}ms");
+                $"Expected proactive delay for low remaining requests, but only took {elapsed.TotalMilliseconds}ms");
+            
+            // Verify still no logs even when proactively throttling (but not exceeding)
+            VerifyNoLogsProduced();
         }
         
         [TestMethod]
@@ -125,6 +138,9 @@ namespace crypto_bot_api.Tests.Services
             // from first retry in the linear backoff pattern
             Assert.IsTrue(elapsed.TotalMilliseconds >= 1000,
                 $"Expected linear backoff delay, but only took {elapsed.TotalMilliseconds}ms");
+            
+            // Verify that we get logs ONLY when actually hitting a rate limit
+            VerifyRateLimitLogsProduced();
             
             // We have more detailed verification in the mock setup - this verifies the sequence of calls
             _mockInnerHandler.Protected().Verify(
@@ -149,7 +165,7 @@ namespace crypto_bot_api.Tests.Services
             return request;
         }
         
-        private void SetupMockResponse(HttpStatusCode statusCode, int remainingRequests = 29)
+        private void SetupMockResponse(HttpStatusCode statusCode, int remainingRequests = 30)
         {
             _mockInnerHandler
                 .Protected()
@@ -197,6 +213,32 @@ namespace crypto_bot_api.Tests.Services
                         return response;
                     }
                 });
+        }
+        
+        private void VerifyNoLogsProduced()
+        {
+            // Verify that no logs at any level were produced
+            _mockLogger.Verify(
+                x => x.Log(
+                    It.IsAny<LogLevel>(),
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception?>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Never);
+        }
+        
+        private void VerifyRateLimitLogsProduced()
+        {
+            // Verify that warning logs were produced (for rate limit exceeded)
+            _mockLogger.Verify(
+                x => x.Log(
+                    LogLevel.Warning,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("rate limit exceeded")),
+                    It.IsAny<Exception?>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
         }
         
         #endregion

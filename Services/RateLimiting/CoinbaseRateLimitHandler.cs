@@ -41,9 +41,7 @@ namespace crypto_bot_api.Services.RateLimiting
             {
                 if (_options.LastRemainingPrivateRequests <= 1)
                 {
-                    // Apply a small delay to avoid hitting the rate limit
-                    _logger.LogDebug("Private endpoint approaching rate limit. Delaying request for {DelayMs}ms", 
-                        LowRemainingDelayMs);
+                    // Apply a small delay to avoid hitting the rate limit - silent operation
                     await Task.Delay(LowRemainingDelayMs, cancellationToken);
                 }
             }
@@ -64,9 +62,8 @@ namespace crypto_bot_api.Services.RateLimiting
                         break;
                     }
                     
-                    // Log the rate limit exceeded error
-                    _logger.LogWarning("Rate limit exceeded for {Url}. Retry attempt {RetryCount} of {MaxRetry}",
-                        request.RequestUri, retryCount, MaxRetryCount);
+                    // Only log when we actually hit a rate limit
+                    LogRateLimitExceeded(response, request.RequestUri!, isPublicEndpoint);
                     
                     // Calculate backoff delay with linear increase and jitter
                     var backoffDelayMs = BaseRetryDelayMs * (retryCount + 1);
@@ -94,11 +91,10 @@ namespace crypto_bot_api.Services.RateLimiting
                 throw new CoinbaseApiException($"Rate limit exceeded after {MaxRetryCount} retries. Response: {responseContent}");
             }
             
-            // For private endpoints, extract and store the remaining count
+            // For private endpoints, silently update the remaining request count without logging
             if (!isPublicEndpoint && response != null)
             {
                 UpdatePrivateEndpointRateLimitState(response);
-                LogRateLimitHeaders(response, request.RequestUri!);
             }
             
             return response!;
@@ -113,16 +109,11 @@ namespace crypto_bot_api.Services.RateLimiting
                 _options.RecentPublicRequests.TryDequeue(out _);
             }
             
-            // If we've reached the limit of public requests per second, wait
+            // If we've reached the limit of public requests per second, wait silently
             if (_options.RecentPublicRequests.Count >= _options.PublicEndpointRateLimit)
             {
-                // Calculate time to wait - simple approach to space requests over the next second
-                var delay = TimeSpan.FromMilliseconds(100); // Small initial delay
-                
-                _logger.LogDebug("Public endpoint rate limit reached. Delaying request for {DelayMs}ms", 
-                    (int)delay.TotalMilliseconds);
-                
-                await Task.Delay(delay, cancellationToken);
+                // Small delay to spread requests - silent operation
+                await Task.Delay(100, cancellationToken);
             }
             
             // Record this request timestamp
@@ -136,13 +127,6 @@ namespace crypto_bot_api.Services.RateLimiting
                 int.TryParse(remainingValue, out int remaining))
             {
                 _options.LastRemainingPrivateRequests = remaining;
-                
-                // If we're getting close to the limit, log a warning
-                if (remaining <= 5)
-                {
-                    _logger.LogWarning("Private endpoint rate limit running low. Only {Remaining} requests remaining.", 
-                        remaining);
-                }
             }
         }
         
@@ -165,19 +149,15 @@ namespace crypto_bot_api.Services.RateLimiting
             return newRequest;
         }
         
-        private void LogRateLimitHeaders(HttpResponseMessage response, Uri requestUri)
+        private void LogRateLimitExceeded(HttpResponseMessage response, Uri requestUri, bool isPublicEndpoint)
         {
-            // Extract rate limit headers
+            string endpointType = isPublicEndpoint ? "Public" : "Private";
             string limitValue = GetHeaderValue(response, "x-ratelimit-limit");
             string remainingValue = GetHeaderValue(response, "x-ratelimit-remaining");
             string resetValue = GetHeaderValue(response, "x-ratelimit-reset");
             
-            // Only log if we have the headers
-            if (!string.IsNullOrEmpty(limitValue) || !string.IsNullOrEmpty(remainingValue))
-            {
-                _logger.LogDebug("Rate limit for {Url}: Limit={Limit}, Remaining={Remaining}, Reset={Reset}",
-                    requestUri, limitValue, remainingValue, resetValue);
-            }
+            _logger.LogWarning("{EndpointType} endpoint rate limit exceeded for {Url}. Limit={Limit}, Remaining={Remaining}, Reset={Reset}",
+                endpointType, requestUri, limitValue, remainingValue, resetValue);
         }
         
         private string GetHeaderValue(HttpResponseMessage response, string headerName)

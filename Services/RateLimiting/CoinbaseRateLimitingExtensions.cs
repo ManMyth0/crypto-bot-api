@@ -5,9 +5,7 @@ namespace crypto_bot_api.Services.RateLimiting
 {
     public static class CoinbaseRateLimitingExtensions
     {
-        /// <summary>
-        /// Adds Coinbase API rate limiting services to the service collection
-        /// </summary>
+        // Adds Coinbase API rate limiting services to the service collection
         public static IServiceCollection AddCoinbaseRateLimiting(this IServiceCollection services, 
             IConfiguration configuration)
         {
@@ -18,6 +16,13 @@ namespace crypto_bot_api.Services.RateLimiting
                 {
                     options.PublicEndpointRateLimit = publicLimit;
                 }
+                
+                // Allow configuration of private endpoint rate limit
+                if (int.TryParse(configuration["CoinbaseApi:RateLimit:PrivateEndpointRateLimit"], out int privateLimit))
+                {
+                    options.PrivateEndpointRateLimit = privateLimit;
+                    options.LastRemainingPrivateRequests = privateLimit; // Initialize with the full limit
+                }
             });
             
             // Register the rate limit handler
@@ -26,9 +31,8 @@ namespace crypto_bot_api.Services.RateLimiting
             return services;
         }
         
-        /// <summary>
-        /// Adds an HTTP client with Coinbase rate limiting for a specific API client
-        /// </summary>
+
+        // Adds an HTTP client with Coinbase rate limiting for a specific API client
         public static IHttpClientBuilder AddCoinbaseHttpClient<TClient, TImplementation>(
             this IServiceCollection services)
             where TClient : class
