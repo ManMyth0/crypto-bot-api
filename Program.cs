@@ -1,5 +1,6 @@
 using crypto_bot_api.Data;
 using crypto_bot_api.Services;
+using crypto_bot_api.Services.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,8 +22,8 @@ var apiSecret = builder.Configuration["CoinbaseApi:ApiSecret"];
 // Add services to the container
 builder.Services.AddAuthorization();
 
-// Register HttpClient
-builder.Services.AddHttpClient();
+// Register HttpClient with rate limiting
+builder.Services.AddCoinbaseRateLimiting(builder.Configuration);
 
 // Retrieve the connection string from configuration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -31,9 +32,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Register services for Coinbase API clients
-builder.Services.AddScoped<ICoinbaseAccountApiClient, CoinbaseAccountApiClient>();
-builder.Services.AddScoped<ICoinbaseOrderApiClient, CoinbaseOrderApiClient>();
+// Register services for Coinbase API clients with rate limiting
+builder.Services.AddCoinbaseHttpClient<ICoinbaseAccountApiClient, CoinbaseAccountApiClient>();
+builder.Services.AddCoinbaseHttpClient<ICoinbaseOrderApiClient, CoinbaseOrderApiClient>();
 
 // Add controllers to the container
 builder.Services.AddControllers();
