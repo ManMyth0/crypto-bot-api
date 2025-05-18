@@ -1,19 +1,43 @@
+using System;
 using System.Collections.Concurrent;
 
 namespace crypto_bot_api.Services.RateLimiting
 {
     public class RateLimitOptions
     {
-        // Public endpoint limit - set to 9 instead of 10 to avoid inconsistent throttling
-        public int PublicEndpointRateLimit { get; set; } = 9;
-        
-        // Private endpoint cap - using the full 30 requests per second limit
+        // Default rate limits from Coinbase Advanced API docs
+        public int PublicEndpointRateLimit { get; set; } = 10;
         public int PrivateEndpointRateLimit { get; set; } = 30;
+        public int OrderManagementEndpointRateLimit { get; set; } = 10;
+        public int GlobalHourlyRateLimit { get; set; } = 10000;
         
-        // Track recent public requests to enforce the rate limit
-        public ConcurrentQueue<DateTime> RecentPublicRequests { get; } = new();
+        // Target slightly below the limit to give buffer
+        public int HourlyRequestsTarget => GlobalHourlyRateLimit - 100;
         
-        // Track the last observed remaining request count for private endpoints
+        // Tracking for rate limits
+        public ConcurrentQueue<DateTime> HourlyRequestsTimestamps { get; } = new ConcurrentQueue<DateTime>();
+        public ConcurrentQueue<DateTime> RecentPublicRequests { get; } = new ConcurrentQueue<DateTime>();
+        
+        // Private requests in current window
+        public int PrivateRequestsMadeInWindow { get; set; } = 0;
+        public DateTimeOffset PrivateRateLimitResetTime { get; set; } = DateTimeOffset.UtcNow.AddMinutes(1);
+        
+        // Last known values from server
         public int LastRemainingPrivateRequests { get; set; } = 30;
+        public bool HasReceivedResetTime { get; set; } = false;
+        
+        public int EstimatedRemainingHourlyRequests(DateTimeOffset now)
+        {
+            // Remove timestamps older than 1 hour
+            DateTime oldestTime;
+            while (HourlyRequestsTimestamps.Count > 0 &&
+                   HourlyRequestsTimestamps.TryPeek(out oldestTime) &&
+                   oldestTime < now.AddHours(-1))
+            {
+                HourlyRequestsTimestamps.TryDequeue(out _);
+            }
+            
+            return HourlyRequestsTarget - HourlyRequestsTimestamps.Count;
+        }
     }
 } 

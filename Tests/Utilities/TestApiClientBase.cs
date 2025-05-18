@@ -12,13 +12,15 @@ namespace crypto_bot_api.Tests.Utilities
         protected readonly HttpClient _client;
         protected readonly Mock<HttpMessageHandler> _mockHandler;
         protected readonly string _baseUrl = "https://api.coinbase.com";
+        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
 
         protected TestApiClientBase(Mock<HttpMessageHandler> mockHandler)
         {
             _mockHandler = mockHandler;
             _client = new HttpClient(mockHandler.Object)
             {
-                BaseAddress = new Uri(_baseUrl)
+                BaseAddress = new Uri(_baseUrl),
+                Timeout = DefaultTimeout
             };
         }
 
@@ -42,6 +44,7 @@ namespace crypto_bot_api.Tests.Utilities
 
         protected async Task<T> SendRequestAsync<T>(HttpMethod method, string endpoint, object? content = null)
         {
+            using var cts = new CancellationTokenSource(DefaultTimeout);
             string fullUrl = $"{_baseUrl}{endpoint}";
             var request = new HttpRequestMessage(method, fullUrl);
 
@@ -53,8 +56,8 @@ namespace crypto_bot_api.Tests.Utilities
                     "application/json");
             }
 
-            var response = await _client.SendAsync(request);
-            string jsonResponse = await response.Content.ReadAsStringAsync();
+            var response = await _client.SendAsync(request, cts.Token);
+            string jsonResponse = await response.Content.ReadAsStringAsync(cts.Token);
 
             if (!response.IsSuccessStatusCode)
             {
