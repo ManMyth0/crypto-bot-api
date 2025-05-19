@@ -1,3 +1,4 @@
+// Base class for Coinbase API clients
 using System.Text;
 using System.Net.Http;
 using System.Text.Json;
