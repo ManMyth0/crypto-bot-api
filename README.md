@@ -52,7 +52,7 @@ dotnet build    # Compile the project
 dotnet run      # Run the application
 ```
 
-The API will be available at `http://localhost:5294`.
+The API will be available at `http://localhost:5294` or whatever your local host port number is.
 
 ## API Endpoints
 
