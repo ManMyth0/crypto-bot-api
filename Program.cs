@@ -36,6 +36,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddCoinbaseHttpClient<ICoinbaseAccountApiClient, CoinbaseAccountApiClient>();
 builder.Services.AddCoinbaseHttpClient<ICoinbaseOrderApiClient, CoinbaseOrderApiClient>();
 
+// Register OrderMonitoringService
+builder.Services.AddScoped<IOrderMonitoringService, OrderMonitoringService>();
+
 // Add controllers to the container
 builder.Services.AddControllers();
 
