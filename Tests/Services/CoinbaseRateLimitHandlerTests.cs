@@ -22,13 +22,13 @@ namespace crypto_bot_api.Tests.Services
     [TestClass]
     public class CoinbaseRateLimitHandlerTests
     {
-        private Mock<IOptions<RateLimitOptions>> _mockOptions;
-        private Mock<ILogger<CoinbaseRateLimitHandler>> _mockLogger;
-        private Mock<HttpMessageHandler> _mockInnerHandler;
-        private MockTimeProvider _timeProvider;
-        private CoinbaseRateLimitHandler _handler;
-        private HttpClient _client;
-        private RateLimitOptions _options;
+        private Mock<IOptions<RateLimitOptions>> _mockOptions = new();
+        private Mock<ILogger<CoinbaseRateLimitHandler>> _mockLogger = new();
+        private Mock<HttpMessageHandler> _mockInnerHandler = new();
+        private MockTimeProvider _timeProvider = new();
+        private CoinbaseRateLimitHandler _handler = null!;
+        private HttpClient _client = null!;
+        private RateLimitOptions _options = new();
         
         [TestInitialize]
         public void Setup()
