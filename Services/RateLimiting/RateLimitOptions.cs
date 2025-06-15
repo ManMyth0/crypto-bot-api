@@ -11,8 +11,8 @@ namespace crypto_bot_api.Services.RateLimiting
         public int OrderManagementEndpointRateLimit { get; set; } = 10;
         public int GlobalHourlyRateLimit { get; set; } = 10000;
         
-        // Target slightly below the limit to give buffer
-        public int HourlyRequestsTarget => GlobalHourlyRateLimit - 100;
+        // Target slightly below the limit to give minimal buffer
+        public int HourlyRequestsTarget => GlobalHourlyRateLimit - 5;
         
         // Tracking for rate limits
         public ConcurrentQueue<DateTime> HourlyRequestsTimestamps { get; } = new ConcurrentQueue<DateTime>();

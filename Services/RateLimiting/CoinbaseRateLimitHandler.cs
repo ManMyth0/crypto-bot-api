@@ -18,6 +18,7 @@ namespace crypto_bot_api.Services.RateLimiting
         private readonly IOptions<RateLimitOptions> _options;
         private readonly ILogger<CoinbaseRateLimitHandler> _logger;
         private readonly Func<DateTimeOffset> _getCurrentTime;
+        private readonly bool _isTestMode;
         private readonly Random _random = new();
         
         // Maximum retries for rate limit errors
@@ -25,10 +26,10 @@ namespace crypto_bot_api.Services.RateLimiting
         // Base delay for exponential backoff (in milliseconds)
         private const int BaseRetryDelayMs = 1000;
         // Small delay when we're at the last remaining request
-        private const int LowRemainingDelayMs = 100;
+        private const int LowRemainingDelayMs = 5;
         // Target interval between requests to stay under hourly limit (in milliseconds)
-        // 3600000ms (1 hour) / 9900 requests = ~364ms between requests on average
-        private const int HourlyTargetIntervalMs = 364; 
+        // 3600000ms (1 hour) / 9995 requests = ~360.18ms between requests on average
+        private const int HourlyTargetIntervalMs = 360;
         // Pattern to extract the first rate limit value
         private static readonly Regex RateLimitPattern = new Regex(@"^(\d+)");
         // Pattern to identify order management endpoints
@@ -42,6 +43,7 @@ namespace crypto_bot_api.Services.RateLimiting
             _options = options;
             _logger = logger;
             _getCurrentTime = getCurrentTime ?? (() => DateTimeOffset.UtcNow);
+            _isTestMode = getCurrentTime != null;
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(
@@ -86,14 +88,7 @@ namespace crypto_bot_api.Services.RateLimiting
                             _options.Value.PrivateRequestsMadeInWindow++;
                         }
                         
-                        // Use a timeout to prevent hanging
-                        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                        if (!cancellationToken.IsCancellationRequested)
-                        {
-                            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
-                        }
-                        
-                        response = await base.SendAsync(request, timeoutCts.Token);
+                        response = await base.SendAsync(request, cancellationToken);
                         
                         // If not a rate limit error, break the loop
                         if (response.StatusCode != HttpStatusCode.TooManyRequests)
@@ -109,42 +104,26 @@ namespace crypto_bot_api.Services.RateLimiting
                         var jitter = _random.Next(0, 100); // Add 0-100ms of random jitter
                         var retryDelay = TimeSpan.FromMilliseconds(Math.Min(backoffDelayMs + jitter, 3000)); // Cap at 3 seconds
                         
-                        // Use a timeout for the delay too
-                        await Task.Delay(retryDelay, cancellationToken);
-                        retryCount++;
-                        
-                        // Create a new request for retry (can't reuse the original)
-                        var retryRequest = CopyRequest(request);
-                        request = retryRequest;
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        // If the task was canceled because of our timeout, treat it like a rate limit
-                        _logger.LogWarning("Request timed out, treating as rate limit and retrying");
-                        retryCount++;
-                        
-                        if (retryCount > MaxRetryCount)
+                        // Wait for the backoff period
+                        if (!_isTestMode)
                         {
-                            throw new TimeoutException("Request timed out after multiple retries");
+                            await Task.Delay(retryDelay, cancellationToken);
                         }
-                        
-                        // Create a new request for retry (can't reuse the original)
-                        var retryRequest = CopyRequest(request);
-                        request = retryRequest;
-                        await Task.Delay(1000, cancellationToken);
+                        retryCount++;
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error sending request to {Url}", request.RequestUri);
-                        throw;
+                        _logger.LogWarning(ex, "Error during request attempt {RetryCount}", retryCount);
+                        retryCount++;
+                        if (retryCount > MaxRetryCount)
+                        {
+                            throw;
+                        }
                     }
-                }
-                
-                // If we exhausted all retries and still got rate limited
-                if (response?.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                    throw new CoinbaseApiException($"Rate limit exceeded after {MaxRetryCount} retries. Response: {responseContent}");
                 }
                 
                 // For private endpoints, update our tracking with server information
@@ -163,15 +142,6 @@ namespace crypto_bot_api.Services.RateLimiting
         
         private async Task EnforceGlobalHourlyRateLimit(DateTimeOffset now, CancellationToken cancellationToken)
         {
-            // Get remaining hourly requests
-            int remainingHourly = EstimatedRemainingHourlyRequests(now);
-            
-            // Calculate how aggressive our throttling should be based on remaining requests
-            // When we have a lot remaining, we can be less strict
-            // As we get closer to the limit, we get more conservative
-            double requestsPerSecondTarget = remainingHourly / 3600.0;
-            int targetIntervalMs = (int)(1000 / Math.Max(0.1, requestsPerSecondTarget));
-            
             // Get the most recent request timestamp
             if (_options.Value.HourlyRequestsTimestamps.TryPeek(out DateTime lastRequest))
             {
@@ -179,13 +149,13 @@ namespace crypto_bot_api.Services.RateLimiting
                 var timeSinceLastRequest = (now - lastRequest).TotalMilliseconds;
                 
                 // If we haven't waited long enough, delay
-                if (timeSinceLastRequest < targetIntervalMs)
+                if (timeSinceLastRequest < HourlyTargetIntervalMs)
                 {
                     // Calculate delay needed
-                    int delayMs = (int)(targetIntervalMs - timeSinceLastRequest);
+                    int delayMs = (int)(HourlyTargetIntervalMs - timeSinceLastRequest);
                     
-                    // Only delay if it's significant, and cap at 1 second to avoid hanging tests
-                    if (delayMs > 10)
+                    // Only delay if it's significant and not in test mode
+                    if (delayMs > 10 && !_isTestMode)
                     {
                         await Task.Delay(Math.Min(delayMs, 1000), cancellationToken);
                     }

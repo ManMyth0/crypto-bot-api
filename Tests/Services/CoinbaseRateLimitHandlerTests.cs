@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace crypto_bot_api.Tests.Services
 {
@@ -140,11 +141,72 @@ namespace crypto_bot_api.Tests.Services
             Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
             Assert.AreEqual(2, callCount, "Expected exactly 2 calls due to retry");
         }
+        
+        [TestMethod]
+        public async Task GlobalHourlyRateLimit_AllowsAggressiveUsage()
+        {
+            // Arrange
+            var requests = new List<DateTimeOffset>();
+            var startTime = DateTimeOffset.UtcNow;
+            _timeProvider = new MockTimeProvider();
+            _timeProvider._currentTime = startTime;
+            
+            _mockInnerHandler
+                .Protected()
+                .Setup<Task<HttpResponseMessage>>(
+                    "SendAsync",
+                    ItExpr.IsAny<HttpRequestMessage>(),
+                    ItExpr.IsAny<CancellationToken>())
+                .ReturnsAsync(() => 
+                {
+                    requests.Add(_timeProvider.GetCurrentTime());
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"data\": \"test\"}")
+                    };
+                });
+                
+            // Act - Make requests sequentially to properly observe rate limiting
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); // Increased timeout
+            
+            try 
+            {
+                // Make initial request to establish baseline
+                var request = new HttpRequestMessage(HttpMethod.Get, "/api/v3/brokerage/products");
+                await _client.SendAsync(request, cts.Token);
+                
+                // Make additional requests with explicit time advancement
+                for (int i = 0; i < 9; i++) // 9 more requests for a total of 10
+                {
+                    // Advance time by target interval
+                    _timeProvider.AdvanceTime(TimeSpan.FromMilliseconds(360));
+                    
+                    request = new HttpRequestMessage(HttpMethod.Get, "/api/v3/brokerage/products");
+                    await _client.SendAsync(request, cts.Token);
+                }
+                
+                // Assert
+                // Verify we made all 10 requests
+                Assert.AreEqual(10, requests.Count, "Should have made exactly 10 requests");
+                
+                // Verify timestamps are monotonically increasing with correct intervals
+                for (int i = 1; i < requests.Count; i++)
+                {
+                    var interval = (requests[i] - requests[i-1]).TotalMilliseconds;
+                    Assert.AreEqual(360, interval, 1.0,
+                        $"Interval between request {i-1} and {i} should be 360ms, was {interval}ms");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Assert.Fail("Test timed out after 30 seconds");
+            }
+        }
     }
     
     public class MockTimeProvider
     {
-        private DateTimeOffset _currentTime;
+        public DateTimeOffset _currentTime;
 
         public MockTimeProvider()
         {
@@ -158,6 +220,10 @@ namespace crypto_bot_api.Tests.Services
 
         public void AdvanceTime(TimeSpan duration)
         {
+            if (duration.TotalMilliseconds < 0)
+            {
+                throw new ArgumentException("Cannot advance time backwards", nameof(duration));
+            }
             _currentTime = _currentTime.Add(duration);
         }
     }
