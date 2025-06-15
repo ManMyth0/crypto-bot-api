@@ -17,6 +17,7 @@ namespace crypto_bot_api.Services
         private readonly TimeSpan _pollingInterval;
         private readonly TimeSpan _defaultTimeout;
         private readonly int _maxAttempts = 1000; // Safety limit for number of polling attempts
+        private readonly int _maxRetries = 3; // Maximum number of retries for API errors
 
         public OrderMonitoringService(
             ICoinbaseOrderApiClient orderApiClient,
@@ -41,23 +42,15 @@ namespace crypto_bot_api.Services
                 TimeSpan timeout = _defaultTimeout;
                 JsonObject? order = null;
 
-                try
+                // First check to get initial state with retries
+                order = await RetryOnError(async () =>
                 {
-                    // First check to get initial state
                     var orderResponse = await _orderApiClient.ListOrdersAsync(
                         new ListOrdersRequestDto { OrderIds = new[] { orderId } });
 
                     cancellationToken.ThrowIfCancellationRequested();
-                    order = (orderResponse["orders"] as JsonArray)?.FirstOrDefault()?.AsObject();
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    throw new CoinbaseApiException($"Error retrieving order {orderId}: {ex.Message}", ex);
-                }
+                    return (orderResponse["orders"] as JsonArray)?.FirstOrDefault()?.AsObject();
+                }, cancellationToken);
 
                 if (order == null)
                 {
@@ -89,6 +82,16 @@ namespace crypto_bot_api.Services
                 }
 
                 var status = order["status"]?.ToString();
+                if (status == null)
+                {
+                    throw new CoinbaseApiException($"Order {orderId} has no status field");
+                }
+
+                if (!IsValidOrderState(status))
+                {
+                    throw new CoinbaseApiException($"Order {orderId} has invalid status: {status}");
+                }
+
                 if (IsTerminalState(status))
                 {
                     // Only check fills for FILLED state or if there might be partial fills
@@ -111,32 +114,29 @@ namespace crypto_bot_api.Services
                     {
                         await Task.Delay(_pollingInterval, linkedCts.Token);
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested)
                     {
-                        // Check which token triggered the cancellation
-                        if (timeoutCts.Token.IsCancellationRequested)
-                        {
-                            throw new TimeoutException($"Order {orderId} monitoring exceeded timeout of {timeout.TotalMinutes} minutes");
-                        }
-                        throw; // User cancellation
+                        throw new TimeoutException($"Order {orderId} monitoring exceeded timeout of {timeout.TotalMinutes} minutes");
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
                     }
 
+                    // Get order status with retries
                     try
                     {
-                        var orderResponse = await _orderApiClient.ListOrdersAsync(
-                            new ListOrdersRequestDto { OrderIds = new[] { orderId } });
-
-                        // Check for cancellation after API call
-                        if (timeoutCts.Token.IsCancellationRequested)
+                        order = await RetryOnError(async () =>
                         {
-                            throw new TimeoutException($"Order {orderId} monitoring exceeded timeout of {timeout.TotalMinutes} minutes");
-                        }
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            throw new OperationCanceledException(cancellationToken);
-                        }
+                            var orderResponse = await _orderApiClient.ListOrdersAsync(
+                                new ListOrdersRequestDto { OrderIds = new[] { orderId } });
 
-                        order = (orderResponse["orders"] as JsonArray)?.FirstOrDefault()?.AsObject();
+                            return (orderResponse["orders"] as JsonArray)?.FirstOrDefault()?.AsObject();
+                        }, linkedCts.Token);
+                    }
+                    catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested)
+                    {
+                        throw new TimeoutException($"Order {orderId} monitoring exceeded timeout of {timeout.TotalMinutes} minutes");
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -151,6 +151,16 @@ namespace crypto_bot_api.Services
                     }
 
                     status = order["status"]?.ToString();
+                    if (status == null)
+                    {
+                        throw new CoinbaseApiException($"Order {orderId} has no status field");
+                    }
+
+                    if (!IsValidOrderState(status))
+                    {
+                        throw new CoinbaseApiException($"Order {orderId} has invalid status: {status}");
+                    }
+
                     if (IsTerminalState(status))
                     {
                         // Only check fills for FILLED state or if there might be partial fills
@@ -172,11 +182,15 @@ namespace crypto_bot_api.Services
 
                 throw new TimeoutException($"Order {orderId} monitoring exceeded timeout of {timeout.TotalMinutes} minutes");
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException ex)
             {
+                if (ex is TaskCanceledException && ex.CancellationToken.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    throw new TimeoutException($"Order {orderId} monitoring exceeded timeout", ex);
+                }
                 throw;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException and not TimeoutException)
+            catch (Exception ex) when (ex is not TimeoutException)
             {
                 throw new CoinbaseApiException($"Error monitoring order {orderId}: {ex.Message}", ex);
             }
@@ -184,8 +198,11 @@ namespace crypto_bot_api.Services
 
         private async Task<JsonArray> GetOrderFills(string orderId)
         {
-            var fillsResponse = await _orderApiClient.ListOrderFillsAsync(
-                new ListOrderFillsRequestDto { OrderId = orderId });
+            var fillsResponse = await RetryOnError(async () =>
+            {
+                return await _orderApiClient.ListOrderFillsAsync(
+                    new ListOrderFillsRequestDto { OrderId = orderId });
+            });
 
             return fillsResponse["fills"] as JsonArray ?? new JsonArray();
         }
@@ -193,6 +210,51 @@ namespace crypto_bot_api.Services
         private static bool IsTerminalState(string? status)
         {
             return status is "FILLED" or "CANCELLED" or "EXPIRED" or "REJECTED";
+        }
+
+        private static bool IsValidOrderState(string status)
+        {
+            return status is "OPEN" or "FILLED" or "CANCELLED" or "EXPIRED" or "REJECTED" or "PENDING";
+        }
+
+        private async Task<T> RetryOnError<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
+        {
+            int retryCount = 0;
+            Exception? lastException = null;
+
+            while (retryCount <= _maxRetries)
+            {
+                try
+                {
+                    return await operation();
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    lastException = ex;
+                    retryCount++;
+
+                    if (retryCount > _maxRetries)
+                    {
+                        break;
+                    }
+
+                    // Add exponential backoff delay
+                    var delay = TimeSpan.FromMilliseconds(Math.Pow(2, retryCount) * 100);
+                    await Task.Delay(delay, cancellationToken);
+                }
+            }
+
+            // If we've exhausted retries, throw the last exception
+            if (lastException != null)
+            {
+                throw lastException;
+            }
+
+            throw new TimeoutException("Operation timed out after maximum retries");
         }
     }
 } 

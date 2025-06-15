@@ -1,5 +1,6 @@
 using Moq;
 using System.Net;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using crypto_bot_api.Services;
 using crypto_bot_api.Models;
@@ -14,7 +15,7 @@ namespace crypto_bot_api.Tests.Services
     {
         private Mock<ICoinbaseOrderApiClient> _mockOrderApiClient = null!;
         private Mock<IAssembleOrderDetailsService> _mockAssembleService = null!;
-        private IOrderMonitoringService _monitoringService = null!;
+        private IOrderMonitoringService _orderMonitoringService = null!;
         private const string TestOrderId = "test-order-123";
 
         [TestInitialize]
@@ -22,11 +23,11 @@ namespace crypto_bot_api.Tests.Services
         {
             _mockOrderApiClient = new Mock<ICoinbaseOrderApiClient>();
             _mockAssembleService = new Mock<IAssembleOrderDetailsService>();
-            _monitoringService = new OrderMonitoringService(
+            _orderMonitoringService = new OrderMonitoringService(
                 _mockOrderApiClient.Object,
                 _mockAssembleService.Object,
-                TimeSpan.FromMilliseconds(1),  // Fast polling for tests
-                TimeSpan.FromSeconds(1));      // Reasonable timeout for tests
+                TimeSpan.FromMilliseconds(100),  // Shorter polling interval for tests
+                TimeSpan.FromSeconds(5));        // Longer timeout for tests
         }
 
         private void SetupMockResponses(JsonObject orderListResponse, JsonObject fillsResponse)
@@ -40,26 +41,42 @@ namespace crypto_bot_api.Tests.Services
                 .ReturnsAsync(fillsResponse);
         }
 
-        private static JsonObject CreateOrderListResponse(bool includeOrder, string status = "OPEN", string size = "1.0")
+        private static JsonObject CloneOrderNode(JsonNode? node)
+        {
+            if (node == null)
+            {
+                throw new ArgumentNullException(nameof(node));
+            }
+
+            var json = node.ToJsonString();
+            var clonedNode = JsonNode.Parse(json);
+            if (clonedNode == null)
+            {
+                throw new InvalidOperationException("Failed to parse JSON node");
+            }
+
+            return clonedNode.AsObject();
+        }
+
+        private static JsonObject CreateOrderListResponse(bool includeOrder, string status = "OPEN", string size = "1.0", string orderId = "test-order-123")
         {
             if (!includeOrder)
             {
                 return CreateEmptyOrderListResponse();
             }
 
+            var orderObject = new JsonObject
+            {
+                ["order_id"] = orderId,
+                ["status"] = status,
+                ["size"] = size,
+                ["side"] = "BUY",
+                ["product_id"] = "BTC-USD"
+            };
+
             return new JsonObject
             {
-                ["orders"] = new JsonArray
-                {
-                    new JsonObject
-                    {
-                        ["order_id"] = TestOrderId,
-                        ["status"] = status,
-                        ["size"] = size,
-                        ["side"] = "BUY",
-                        ["product_id"] = "BTC-USD"
-                    }
-                }
+                ["orders"] = new JsonArray { orderObject }
             };
         }
 
@@ -143,7 +160,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -189,7 +206,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -229,7 +246,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -273,7 +290,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -313,7 +330,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -354,7 +371,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -377,7 +394,7 @@ namespace crypto_bot_api.Tests.Services
 
             // Act & Assert
             await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
-                async () => await _monitoringService.MonitorOrderAsync(TestOrderId));
+                async () => await _orderMonitoringService.MonitorOrderAsync(TestOrderId));
         }
 
         [TestMethod]
@@ -393,7 +410,7 @@ namespace crypto_bot_api.Tests.Services
 
             // Act & Assert
             await Assert.ThrowsExceptionAsync<OperationCanceledException>(() =>
-                _monitoringService.MonitorOrderAsync(TestOrderId, cts.Token));
+                _orderMonitoringService.MonitorOrderAsync(TestOrderId, cts.Token));
 
             // Verify number of calls
             _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Once);
@@ -424,7 +441,7 @@ namespace crypto_bot_api.Tests.Services
                 });
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -464,7 +481,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -522,7 +539,7 @@ namespace crypto_bot_api.Tests.Services
 
             // Act & Assert
             var ex = await Assert.ThrowsExceptionAsync<TimeoutException>(
-                async () => await _monitoringService.MonitorOrderAsync(TestOrderId));
+                async () => await _orderMonitoringService.MonitorOrderAsync(TestOrderId));
             
             Assert.IsTrue(ex.Message.Contains("GTD order"));
             _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.AtLeastOnce);
@@ -553,7 +570,7 @@ namespace crypto_bot_api.Tests.Services
 
             // Act & Assert
             var ex = await Assert.ThrowsExceptionAsync<TimeoutException>(
-                async () => await _monitoringService.MonitorOrderAsync(TestOrderId));
+                async () => await _orderMonitoringService.MonitorOrderAsync(TestOrderId));
             
             Assert.IsTrue(ex.Message.Contains("already expired"));
             _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Once);
@@ -572,7 +589,7 @@ namespace crypto_bot_api.Tests.Services
 
             // Act & Assert
             await Assert.ThrowsExceptionAsync<OperationCanceledException>(
-                async () => await _monitoringService.MonitorOrderAsync(TestOrderId, cts.Token));
+                async () => await _orderMonitoringService.MonitorOrderAsync(TestOrderId, cts.Token));
         }
 
         [TestMethod]
@@ -597,7 +614,7 @@ namespace crypto_bot_api.Tests.Services
                 });
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -616,7 +633,7 @@ namespace crypto_bot_api.Tests.Services
 
             // Act & Assert
             await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
-                async () => await _monitoringService.MonitorOrderAsync(TestOrderId));
+                async () => await _orderMonitoringService.MonitorOrderAsync(TestOrderId));
         }
 
         [TestMethod]
@@ -684,7 +701,7 @@ namespace crypto_bot_api.Tests.Services
                 .Returns(expectedDetails);
 
             // Act
-            var result = await _monitoringService.MonitorOrderAsync(TestOrderId);
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -696,6 +713,609 @@ namespace crypto_bot_api.Tests.Services
             // Verify API calls
             _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Exactly(2));
             _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()), Times.Once);
+        }
+
+        [TestMethod]
+        public async Task MonitorOrderAsync_RapidStateTransition_HandlesGracefully()
+        {
+            // Arrange
+            var openOrderResponse = CreateOrderListResponse(true, "OPEN");
+            var filledOrderResponse = CreateOrderListResponse(true, "FILLED");
+            var fillsResponse = CreateFillsResponse(new[] { ("1.0", "2.50") });
+
+            // Setup mock to return OPEN first, then null (order not found), then check fills
+            var callCount = 0;
+            _mockOrderApiClient
+                .Setup(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()))
+                .ReturnsAsync(() =>
+                {
+                    callCount++;
+                    if (callCount == 1) return openOrderResponse;
+                    return CreateEmptyOrderListResponse(); // Order disappeared
+                });
+
+            _mockOrderApiClient
+                .Setup(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()))
+                .ReturnsAsync(fillsResponse);
+
+            var expectedDetails = new FinalizedOrderDetails
+            {
+                Order_Id = TestOrderId,
+                Status = "FILLED",
+                Commissions = 2.50m,
+                Asset_Pair = "BTC-USD",
+                Trade_Type = "BUY"
+            };
+
+            _mockAssembleService
+                .Setup(x => x.AssembleFromFills(
+                    It.Is<string>(s => s == TestOrderId),
+                    It.IsAny<JsonArray>(),
+                    It.Is<string>(s => s == "FILLED"),
+                    It.Is<decimal?>(d => d == 1.0m)))
+                .Returns(expectedDetails);
+
+            // Act
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual("FILLED", result.Status);
+            Assert.AreEqual(2.50m, result.Commissions);
+
+            // Verify the sequence of API calls
+            _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Exactly(2));
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()), Times.Once);
+        }
+
+        [TestMethod]
+        public async Task MonitorOrderAsync_ApiReturns500Error_RetriesAndSucceeds()
+        {
+            // Arrange
+            var openOrderResponse = CreateOrderListResponse(true, "OPEN");
+            var filledOrderResponse = CreateOrderListResponse(true, "FILLED");
+            var fillsResponse = CreateFillsResponse(new[] { ("1.0", "2.50") });
+
+            var callCount = 0;
+            _mockOrderApiClient
+                .Setup(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()))
+                .ReturnsAsync(() =>
+                {
+                    callCount++;
+                    if (callCount == 1) return openOrderResponse;
+                    if (callCount == 2) throw new CoinbaseApiException("Internal Server Error", new Exception("500 Internal Server Error"));
+                    return filledOrderResponse;
+                });
+
+            _mockOrderApiClient
+                .Setup(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()))
+                .ReturnsAsync(fillsResponse);
+
+            var expectedDetails = new FinalizedOrderDetails
+            {
+                Order_Id = TestOrderId,
+                Status = "FILLED",
+                Commissions = 2.50m,
+                Asset_Pair = "BTC-USD",
+                Trade_Type = "BUY"
+            };
+
+            _mockAssembleService
+                .Setup(x => x.AssembleFromFills(
+                    It.Is<string>(s => s == TestOrderId),
+                    It.IsAny<JsonArray>(),
+                    It.Is<string>(s => s == "FILLED"),
+                    It.Is<decimal?>(d => d == 1.0m)))
+                .Returns(expectedDetails);
+
+            // Act
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual("FILLED", result.Status);
+            Assert.AreEqual(2.50m, result.Commissions);
+
+            // Verify API calls - should have retried after the 500 error
+            _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Exactly(3));
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()), Times.Once);
+        }
+
+        [TestMethod]
+        public async Task MonitorOrderAsync_ApiReturnsMalformedJson_HandlesGracefully()
+        {
+            // Arrange
+            var openOrderResponse = CreateOrderListResponse(true, "OPEN");
+            var filledOrderResponse = CreateOrderListResponse(true, "FILLED");
+            var fillsResponse = CreateFillsResponse(new[] { ("1.0", "2.50") });
+
+            var callCount = 0;
+            _mockOrderApiClient
+                .Setup(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()))
+                .ReturnsAsync(() =>
+                {
+                    callCount++;
+                    if (callCount == 1) return openOrderResponse;
+                    if (callCount == 2) throw new CoinbaseApiException("Malformed JSON response", new JsonException("Invalid JSON"));
+                    return filledOrderResponse;
+                });
+
+            _mockOrderApiClient
+                .Setup(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()))
+                .ReturnsAsync(fillsResponse);
+
+            var expectedDetails = new FinalizedOrderDetails
+            {
+                Order_Id = TestOrderId,
+                Status = "FILLED",
+                Commissions = 2.50m,
+                Asset_Pair = "BTC-USD",
+                Trade_Type = "BUY"
+            };
+
+            _mockAssembleService
+                .Setup(x => x.AssembleFromFills(
+                    It.Is<string>(s => s == TestOrderId),
+                    It.IsAny<JsonArray>(),
+                    It.Is<string>(s => s == "FILLED"),
+                    It.Is<decimal?>(d => d == 1.0m)))
+                .Returns(expectedDetails);
+
+            // Act
+            var result = await _orderMonitoringService.MonitorOrderAsync(TestOrderId);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual("FILLED", result.Status);
+            Assert.AreEqual(2.50m, result.Commissions);
+
+            // Verify API calls - should have retried after the malformed JSON
+            _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Exactly(3));
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()), Times.Once);
+        }
+
+        [TestMethod]
+        public async Task MonitorOrderAsync_InvalidStateTransition_ThrowsException()
+        {
+            // Arrange
+            var openOrderResponse = CreateOrderListResponse(true, "OPEN");
+            var invalidOrderResponse = CreateOrderListResponse(true, "INVALID_STATE");
+
+            var callCount = 0;
+            _mockOrderApiClient
+                .Setup(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()))
+                .ReturnsAsync(() =>
+                {
+                    callCount++;
+                    if (callCount == 1) return openOrderResponse;
+                    return invalidOrderResponse;
+                });
+
+            // Act & Assert
+            await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
+                async () => await _orderMonitoringService.MonitorOrderAsync(TestOrderId));
+
+            // Verify API calls
+            _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Exactly(2));
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()), Times.Never);
+        }
+
+        [TestMethod]
+        public async Task MonitorOrderAsync_MissingStatusInResponse_ThrowsException()
+        {
+            // Arrange
+            var orderResponse = new JsonObject
+            {
+                ["orders"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["order_id"] = TestOrderId,
+                        // Missing status field
+                        ["size"] = "1.0",
+                        ["side"] = "BUY",
+                        ["product_id"] = "BTC-USD"
+                    }
+                }
+            };
+
+            _mockOrderApiClient
+                .Setup(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()))
+                .ReturnsAsync(orderResponse);
+
+            // Act & Assert
+            await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
+                async () => await _orderMonitoringService.MonitorOrderAsync(TestOrderId));
+
+            // Verify API calls
+            _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.IsAny<ListOrdersRequestDto>()), Times.Once);
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.IsAny<ListOrderFillsRequestDto>()), Times.Never);
+        }
+
+        [TestMethod]
+        public async Task MonitorMultipleOrdersAsync_HandlesSuccessfully()
+        {
+            // Arrange
+            var order1Id = "test-order-1";
+            var order2Id = "test-order-2";
+            var order3Id = "test-order-3";
+
+            // Setup order responses
+            _mockOrderApiClient.Setup(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(order1Id))))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["orders"] = new JsonArray
+                    {
+                        CloneOrderNode(CreateOrderListResponse(true, "FILLED", "1.0", order1Id)["orders"]?[0])
+                    }
+                });
+
+            _mockOrderApiClient.Setup(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(order2Id))))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["orders"] = new JsonArray
+                    {
+                        CloneOrderNode(CreateOrderListResponse(true, "FILLED", "1.0", order2Id)["orders"]?[0])
+                    }
+                });
+
+            _mockOrderApiClient.Setup(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(order3Id))))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["orders"] = new JsonArray
+                    {
+                        CloneOrderNode(CreateOrderListResponse(true, "FILLED", "1.0", order3Id)["orders"]?[0])
+                    }
+                });
+
+            // Setup order-specific fills responses
+            _mockOrderApiClient.Setup(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order1Id)))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["fills"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["order_id"] = order1Id,
+                            ["size"] = "1.0",
+                            ["price"] = "50000.0",
+                            ["commission"] = "0.1",
+                            ["time"] = DateTime.UtcNow.ToString("O")
+                        }
+                    }
+                });
+
+            _mockOrderApiClient.Setup(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order2Id)))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["fills"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["order_id"] = order2Id,
+                            ["size"] = "1.0",
+                            ["price"] = "51000.0",
+                            ["commission"] = "0.2",
+                            ["time"] = DateTime.UtcNow.ToString("O")
+                        }
+                    }
+                });
+
+            _mockOrderApiClient.Setup(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order3Id)))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["fills"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["order_id"] = order3Id,
+                            ["size"] = "1.0",
+                            ["price"] = "52000.0",
+                            ["commission"] = "0.3",
+                            ["time"] = DateTime.UtcNow.ToString("O")
+                        }
+                    }
+                });
+
+            // Setup AssembleService to return order-specific details
+            _mockAssembleService.Setup(x => x.AssembleFromFills(
+                    It.Is<string>(id => id == order1Id),
+                    It.IsAny<JsonArray>(),
+                    It.IsAny<string>(),
+                    It.IsAny<decimal?>()))
+                .Returns(new FinalizedOrderDetails
+                {
+                    Order_Id = order1Id,
+                    Status = "FILLED",
+                    Initial_Size = 1.0m,
+                    Acquired_Price = 50000.0m,
+                    Commissions = 0.1m
+                });
+
+            _mockAssembleService.Setup(x => x.AssembleFromFills(
+                    It.Is<string>(id => id == order2Id),
+                    It.IsAny<JsonArray>(),
+                    It.IsAny<string>(),
+                    It.IsAny<decimal?>()))
+                .Returns(new FinalizedOrderDetails
+                {
+                    Order_Id = order2Id,
+                    Status = "FILLED",
+                    Initial_Size = 1.0m,
+                    Acquired_Price = 51000.0m,
+                    Commissions = 0.2m
+                });
+
+            _mockAssembleService.Setup(x => x.AssembleFromFills(
+                    It.Is<string>(id => id == order3Id),
+                    It.IsAny<JsonArray>(),
+                    It.IsAny<string>(),
+                    It.IsAny<decimal?>()))
+                .Returns(new FinalizedOrderDetails
+                {
+                    Order_Id = order3Id,
+                    Status = "FILLED",
+                    Initial_Size = 1.0m,
+                    Acquired_Price = 52000.0m,
+                    Commissions = 0.3m
+                });
+
+            // Act
+            var tasks = new[]
+            {
+                _orderMonitoringService.MonitorOrderAsync(order1Id),
+                _orderMonitoringService.MonitorOrderAsync(order2Id),
+                _orderMonitoringService.MonitorOrderAsync(order3Id)
+            };
+
+            var results = await Task.WhenAll(tasks);
+
+            // Assert
+            Assert.IsNotNull(results);
+            Assert.AreEqual(3, results.Length);
+            
+            // Order 1 assertions
+            Assert.IsNotNull(results[0]);
+            Assert.AreEqual(order1Id, results[0].Order_Id);
+            Assert.AreEqual("FILLED", results[0].Status);
+            Assert.AreEqual(0.1m, results[0].Commissions);
+            Assert.AreEqual(50000.0m, results[0].Acquired_Price);
+
+            // Order 2 assertions
+            Assert.IsNotNull(results[1]);
+            Assert.AreEqual(order2Id, results[1].Order_Id);
+            Assert.AreEqual("FILLED", results[1].Status);
+            Assert.AreEqual(0.2m, results[1].Commissions);
+            Assert.AreEqual(51000.0m, results[1].Acquired_Price);
+
+            // Order 3 assertions
+            Assert.IsNotNull(results[2]);
+            Assert.AreEqual(order3Id, results[2].Order_Id);
+            Assert.AreEqual("FILLED", results[2].Status);
+            Assert.AreEqual(0.3m, results[2].Commissions);
+            Assert.AreEqual(52000.0m, results[2].Acquired_Price);
+
+            // Verify API calls
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order1Id)), Times.Once);
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order2Id)), Times.Once);
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order3Id)), Times.Once);
+        }
+
+        [TestMethod]
+        public async Task MonitorMultipleOrdersAsync_SomeOrdersFail_OthersSucceed()
+        {
+            // Arrange
+            var order1Id = "test-order-1";
+            var order2Id = "test-order-2";
+            var order3Id = "test-order-3";
+
+            // Setup successful order responses
+            _mockOrderApiClient.Setup(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(order1Id))))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["orders"] = new JsonArray
+                    {
+                        CloneOrderNode(CreateOrderListResponse(true, "FILLED", "1.0", order1Id)["orders"]?[0])
+                    }
+                });
+
+            // Setup failing order
+            _mockOrderApiClient.Setup(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(order2Id))))
+                .ThrowsAsync(new CoinbaseApiException("Order not found"));
+
+            _mockOrderApiClient.Setup(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(order3Id))))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["orders"] = new JsonArray
+                    {
+                        CloneOrderNode(CreateOrderListResponse(true, "FILLED", "1.0", order3Id)["orders"]?[0])
+                    }
+                });
+
+            // Setup fills responses for successful orders
+            _mockOrderApiClient.Setup(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order1Id)))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["fills"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["order_id"] = order1Id,
+                            ["size"] = "1.0",
+                            ["price"] = "50000.0",
+                            ["commission"] = "0.1",
+                            ["time"] = DateTime.UtcNow.ToString("O")
+                        }
+                    }
+                });
+
+            _mockOrderApiClient.Setup(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order3Id)))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["fills"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["order_id"] = order3Id,
+                            ["size"] = "1.0",
+                            ["price"] = "52000.0",
+                            ["commission"] = "0.3",
+                            ["time"] = DateTime.UtcNow.ToString("O")
+                        }
+                    }
+                });
+
+            // Setup AssembleService for successful orders
+            _mockAssembleService.Setup(x => x.AssembleFromFills(
+                    It.Is<string>(id => id == order1Id),
+                    It.IsAny<JsonArray>(),
+                    It.IsAny<string>(),
+                    It.IsAny<decimal?>()))
+                .Returns(new FinalizedOrderDetails
+                {
+                    Order_Id = order1Id,
+                    Status = "FILLED",
+                    Initial_Size = 1.0m,
+                    Acquired_Price = 50000.0m,
+                    Commissions = 0.1m
+                });
+
+            _mockAssembleService.Setup(x => x.AssembleFromFills(
+                    It.Is<string>(id => id == order3Id),
+                    It.IsAny<JsonArray>(),
+                    It.IsAny<string>(),
+                    It.IsAny<decimal?>()))
+                .Returns(new FinalizedOrderDetails
+                {
+                    Order_Id = order3Id,
+                    Status = "FILLED",
+                    Initial_Size = 1.0m,
+                    Acquired_Price = 52000.0m,
+                    Commissions = 0.3m
+                });
+
+            // Act & Assert
+            var tasks = new Task<FinalizedOrderDetails?>[]
+            {
+                _orderMonitoringService.MonitorOrderAsync(order1Id),
+                Task.Run(async () => {
+                    try
+                    {
+                        return await _orderMonitoringService.MonitorOrderAsync(order2Id);
+                    }
+                    catch (CoinbaseApiException)
+                    {
+                        return null;
+                    }
+                }),
+                _orderMonitoringService.MonitorOrderAsync(order3Id)
+            };
+
+            var results = await Task.WhenAll(tasks);
+
+            // Assert successful orders
+            Assert.IsNotNull(results[0], "First order should succeed");
+            Assert.AreEqual(order1Id, results[0]!.Order_Id);
+            Assert.AreEqual("FILLED", results[0]!.Status);
+            Assert.AreEqual(0.1m, results[0]!.Commissions);
+            Assert.AreEqual(50000.0m, results[0]!.Acquired_Price);
+
+            // Assert failed order
+            Assert.IsNull(results[1], "Second order should fail");
+
+            // Assert successful order
+            Assert.IsNotNull(results[2], "Third order should succeed");
+            Assert.AreEqual(order3Id, results[2]!.Order_Id);
+            Assert.AreEqual("FILLED", results[2]!.Status);
+            Assert.AreEqual(0.3m, results[2]!.Commissions);
+            Assert.AreEqual(52000.0m, results[2]!.Acquired_Price);
+
+            // Verify API calls
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order1Id)), Times.Once);
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order2Id)), Times.Never);
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order3Id)), Times.Once);
+        }
+
+        [TestMethod]
+        public async Task MonitorOrderAsync_WhenNetworkTimeout_ShouldRetryAndSucceed()
+        {
+            // Arrange
+            var orderId = "test-order-timeout";
+            var callCount = 0;
+            var maxRetries = 3;
+
+            // Setup order response with timeouts and eventual success
+            _mockOrderApiClient.Setup(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(orderId))))
+                .Returns(() =>
+                {
+                    callCount++;
+                    if (callCount <= maxRetries)
+                    {
+                        throw new TimeoutException("Network request timed out");
+                    }
+                    return Task.FromResult(new JsonObject
+                    {
+                        ["orders"] = new JsonArray
+                        {
+                            new JsonObject
+                            {
+                                ["order_id"] = orderId,
+                                ["status"] = "FILLED",
+                                ["size"] = "1.0",
+                                ["side"] = "BUY",
+                                ["product_id"] = "BTC-USD"
+                            }
+                        }
+                    });
+                });
+
+            // Setup fills response
+            _mockOrderApiClient.Setup(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == orderId)))
+                .ReturnsAsync(new JsonObject
+                {
+                    ["fills"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["order_id"] = orderId,
+                            ["size"] = "1.0",
+                            ["price"] = "50000.0",
+                            ["commission"] = "0.1",
+                            ["time"] = DateTime.UtcNow.ToString("O")
+                        }
+                    }
+                });
+
+            // Setup AssembleService
+            _mockAssembleService.Setup(x => x.AssembleFromFills(
+                    It.Is<string>(id => id == orderId),
+                    It.IsAny<JsonArray>(),
+                    It.Is<string>(s => s == "FILLED"),
+                    It.Is<decimal?>(d => d == 1.0m)))
+                .Returns(new FinalizedOrderDetails
+                {
+                    Order_Id = orderId,
+                    Status = "FILLED",
+                    Initial_Size = 1.0m,
+                    Acquired_Price = 50000.0m,
+                    Commissions = 0.1m
+                });
+
+            // Act
+            var result = await _orderMonitoringService.MonitorOrderAsync(orderId);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(orderId, result.Order_Id);
+            Assert.AreEqual("FILLED", result.Status);
+            Assert.AreEqual(1.0m, result.Initial_Size);
+            Assert.AreEqual(50000.0m, result.Acquired_Price);
+            Assert.AreEqual(0.1m, result.Commissions);
+
+            // Verify retry behavior
+            Assert.AreEqual(maxRetries + 1, callCount, "Should have retried exactly 3 times before succeeding");
+            _mockOrderApiClient.Verify(x => x.ListOrdersAsync(It.Is<ListOrdersRequestDto>(r => r.OrderIds != null && r.OrderIds.Contains(orderId))), Times.Exactly(maxRetries + 1));
+            _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == orderId)), Times.Once);
         }
     }
 } 
