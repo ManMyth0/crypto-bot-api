@@ -40,6 +40,12 @@ namespace crypto_bot_api.Tests.Services
                 return await Task.FromResult(JsonNode.Parse("{}") as JsonObject ?? new JsonObject());
             }
 
+            public async Task<JsonObject> GetOrderAsync(string orderId)
+            {
+                await Task.CompletedTask;
+                throw new NotImplementedException();
+            }
+
             public new void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
             {
                 base.SetupHttpResponseForMethod(statusCode, content, urlContains, method);

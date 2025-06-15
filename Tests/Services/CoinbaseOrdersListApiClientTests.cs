@@ -133,6 +133,11 @@ namespace crypto_bot_api.Tests.Services
                     $"/api/v3/brokerage/orders/historical/batch{queryString}");
             }
 
+            public Task<JsonObject> GetOrderAsync(string orderId)
+            {
+                throw new NotImplementedException();
+            }
+
             public new void SetupHttpResponseForMethod(HttpStatusCode statusCode, string content, string urlContains, HttpMethod method)
             {
                 base.SetupHttpResponseForMethod(statusCode, content, urlContains, method);

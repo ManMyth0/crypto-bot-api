@@ -11,12 +11,16 @@ namespace crypto_bot_api.Services
     public class CoinbaseOrderApiClient : BaseCoinbaseApiClient, ICoinbaseOrderApiClient
     {
         private readonly new Ed25519JwtHelper _jwtHelper;
+        private readonly HttpClient _httpClient;
+        private new readonly IConfiguration _configuration;
 
         public CoinbaseOrderApiClient(HttpClient client, IConfiguration config)
             : base(client, config)
         {
             // Create Ed25519 JWT helper
             _jwtHelper = new Ed25519JwtHelper(_apiKeyId, _apiSecret);
+            _httpClient = client;
+            _configuration = config;
         }
 
         public async Task<JsonObject> CreateOrderAsync(CreateOrderRequestDto orderRequest)
@@ -210,6 +214,15 @@ namespace crypto_bot_api.Services
             
             string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, "Failed to retrieve orders.");
             return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();
+        }
+
+        public async Task<JsonObject> GetOrderAsync(string orderId)
+        {
+            var response = await _httpClient.GetAsync($"/api/v3/brokerage/orders/{orderId}");
+            response.EnsureSuccessStatusCode();
+            
+            var content = await response.Content.ReadAsStringAsync();
+            return JsonNode.Parse(content)?.AsObject() ?? new JsonObject();
         }
     }
 } 
