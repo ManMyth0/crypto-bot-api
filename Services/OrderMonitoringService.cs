@@ -7,7 +7,7 @@ namespace crypto_bot_api.Services
 {
     public interface IOrderMonitoringService
     {
-        Task<FinalizedOrderDetails> MonitorOrderAsync(string orderId, CancellationToken cancellationToken = default);
+        Task<FinalizedOrderDetails?> MonitorOrderAsync(string orderId, CancellationToken cancellationToken = default);
     }
 
     public class OrderMonitoringService : IOrderMonitoringService
@@ -31,7 +31,7 @@ namespace crypto_bot_api.Services
             _defaultTimeout = defaultTimeout ?? TimeSpan.FromMinutes(30);
         }
 
-        public async Task<FinalizedOrderDetails> MonitorOrderAsync(string orderId, CancellationToken cancellationToken = default)
+        public async Task<FinalizedOrderDetails?> MonitorOrderAsync(string orderId, CancellationToken cancellationToken = default)
         {
             // Check for cancellation before starting
             cancellationToken.ThrowIfCancellationRequested();

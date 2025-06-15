@@ -1075,25 +1075,28 @@ namespace crypto_bot_api.Tests.Services
             Assert.AreEqual(3, results.Length);
             
             // Order 1 assertions
-            Assert.IsNotNull(results[0]);
-            Assert.AreEqual(order1Id, results[0].Order_Id);
-            Assert.AreEqual("FILLED", results[0].Status);
-            Assert.AreEqual(0.1m, results[0].Commissions);
-            Assert.AreEqual(50000.0m, results[0].Acquired_Price);
+            var result1 = results[0];
+            Assert.IsNotNull(result1);
+            Assert.AreEqual(order1Id, result1.Order_Id);
+            Assert.AreEqual("FILLED", result1.Status);
+            Assert.AreEqual(0.1m, result1.Commissions);
+            Assert.AreEqual(50000.0m, result1.Acquired_Price);
 
             // Order 2 assertions
-            Assert.IsNotNull(results[1]);
-            Assert.AreEqual(order2Id, results[1].Order_Id);
-            Assert.AreEqual("FILLED", results[1].Status);
-            Assert.AreEqual(0.2m, results[1].Commissions);
-            Assert.AreEqual(51000.0m, results[1].Acquired_Price);
+            var result2 = results[1];
+            Assert.IsNotNull(result2);
+            Assert.AreEqual(order2Id, result2.Order_Id);
+            Assert.AreEqual("FILLED", result2.Status);
+            Assert.AreEqual(0.2m, result2.Commissions);
+            Assert.AreEqual(51000.0m, result2.Acquired_Price);
 
             // Order 3 assertions
-            Assert.IsNotNull(results[2]);
-            Assert.AreEqual(order3Id, results[2].Order_Id);
-            Assert.AreEqual("FILLED", results[2].Status);
-            Assert.AreEqual(0.3m, results[2].Commissions);
-            Assert.AreEqual(52000.0m, results[2].Acquired_Price);
+            var result3 = results[2];
+            Assert.IsNotNull(result3);
+            Assert.AreEqual(order3Id, result3.Order_Id);
+            Assert.AreEqual("FILLED", result3.Status);
+            Assert.AreEqual(0.3m, result3.Commissions);
+            Assert.AreEqual(52000.0m, result3.Acquired_Price);
 
             // Verify API calls
             _mockOrderApiClient.Verify(x => x.ListOrderFillsAsync(It.Is<ListOrderFillsRequestDto>(r => r.OrderId == order1Id)), Times.Once);

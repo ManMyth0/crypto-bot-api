@@ -5,14 +5,14 @@ namespace crypto_bot_api.Services
 {
     public interface IAssembleOrderDetailsService
     {
-        FinalizedOrderDetails AssembleFromFills(string orderId, JsonArray? fills, string? terminalStatus = null, decimal? initialSize = null);
+        FinalizedOrderDetails? AssembleFromFills(string orderId, JsonArray? fills, string? terminalStatus = null, decimal? initialSize = null);
     }
 
     public class AssembleOrderDetailsService : IAssembleOrderDetailsService
     {
         private readonly TradeMetricsCalculator _calculator = new();
 
-        public FinalizedOrderDetails AssembleFromFills(string orderId, JsonArray? fills, string? terminalStatus = null, decimal? initialSize = null)
+        public FinalizedOrderDetails? AssembleFromFills(string orderId, JsonArray? fills, string? terminalStatus = null, decimal? initialSize = null)
         {
             if (fills == null || fills.Count == 0)
             {
