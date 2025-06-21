@@ -42,13 +42,18 @@ namespace crypto_bot_api.Tests.Services
             // Verify context is initialized
             Assert.IsNotNull(_context, "Database context should be initialized");
 
-            // Arrange, it doesn't matter what we put in here so long as there are valid columns
+            // Arrange
+            var positionId = Guid.NewGuid();
             var testRecord = new TradeRecords
             {
-                TradeTime = DateTime.UtcNow,
-                AcquiredPrice = 50000.00m,
-                AcquiredQuantity = 1.5m,
-                TradeType = "BUY"
+                position_uuid = positionId,
+                asset_pair = "BTC/USD",
+                acquired_price = 50000.00m,
+                acquired_quantity = 1.5m,
+                leftover_quantity = 1.5m,
+                total_commissions = 10.00m,
+                is_position_closed = false,
+                last_updated = DateTime.UtcNow
             };
 
             try
@@ -56,40 +61,41 @@ namespace crypto_bot_api.Tests.Services
                 // CREATE - Test Insert
                 _context.TradeRecords.Add(testRecord);
                 await _context.SaveChangesAsync();
-                Assert.IsTrue(testRecord.TradeId > 0, "Record should have been assigned an ID");
 
                 // READ - Test Retrieval
                 var retrievedRecord = await _context.TradeRecords
-                    .FirstOrDefaultAsync(r => r.TradeId == testRecord.TradeId);
+                    .FirstOrDefaultAsync(r => r.position_uuid == positionId);
                 
                 Assert.IsNotNull(retrievedRecord, "Should be able to retrieve the record");
-                Assert.AreEqual(testRecord.AcquiredPrice, retrievedRecord.AcquiredPrice);
-                Assert.AreEqual(testRecord.AcquiredQuantity, retrievedRecord.AcquiredQuantity);
-                Assert.AreEqual(testRecord.TradeType, retrievedRecord.TradeType);
+                Assert.AreEqual(testRecord.acquired_price, retrievedRecord.acquired_price);
+                Assert.AreEqual(testRecord.acquired_quantity, retrievedRecord.acquired_quantity);
+                Assert.AreEqual(testRecord.asset_pair, retrievedRecord.asset_pair);
+                Assert.AreEqual(testRecord.leftover_quantity, retrievedRecord.leftover_quantity);
 
                 // UPDATE - Test Update
-                retrievedRecord.SoldPrice = 55000.00m;
-                retrievedRecord.OffloadTime = DateTime.UtcNow;
-                retrievedRecord.ProfitLoss = (55000.00m * 1.5m) - (50000.00m * 1.5m);
-                retrievedRecord.PercentageOfReturn = ((55000.00m - 50000.00m) / 50000.00m) * 100;
+                retrievedRecord.leftover_quantity = 0.5m;
+                retrievedRecord.profit_loss = (55000.00m * 1.0m) - (50000.00m * 1.0m) - 20.00m; // Sold 1.0 BTC
+                retrievedRecord.percentage_return = ((55000.00m - 50000.00m) / 50000.00m) * 100;
+                retrievedRecord.total_commissions = 20.00m; // Added sell commission
+                retrievedRecord.last_updated = DateTime.UtcNow;
                 
                 await _context.SaveChangesAsync();
 
                 var updatedRecord = await _context.TradeRecords
-                    .FirstOrDefaultAsync(r => r.TradeId == testRecord.TradeId);
+                    .FirstOrDefaultAsync(r => r.position_uuid == positionId);
                 
                 Assert.IsNotNull(updatedRecord, "Should be able to retrieve the updated record");
-                Assert.AreEqual(55000.00m, updatedRecord.SoldPrice);
-                Assert.IsNotNull(updatedRecord.OffloadTime);
-                Assert.AreEqual(7500.00m, updatedRecord.ProfitLoss);
-                Assert.AreEqual(10.00m, updatedRecord.PercentageOfReturn);
+                Assert.AreEqual(0.5m, updatedRecord.leftover_quantity);
+                Assert.AreEqual(4980.00m, updatedRecord.profit_loss); // 5000 profit - 20 commission
+                Assert.AreEqual(10.00m, updatedRecord.percentage_return);
+                Assert.AreEqual(20.00m, updatedRecord.total_commissions);
 
                 // DELETE - Test Delete
                 _context.TradeRecords.Remove(updatedRecord);
                 await _context.SaveChangesAsync();
 
                 var deletedRecord = await _context.TradeRecords
-                    .FirstOrDefaultAsync(r => r.TradeId == testRecord.TradeId);
+                    .FirstOrDefaultAsync(r => r.position_uuid == positionId);
                 
                 Assert.IsNull(deletedRecord, "Record should have been deleted");
             }

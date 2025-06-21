@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using crypto_bot_api.Data;
@@ -11,9 +12,11 @@ using crypto_bot_api.Data;
 namespace crypto_bot_api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250621222714_UpdateTradeRecordsSchema")]
+    partial class UpdateTradeRecordsSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -24,10 +27,12 @@ namespace crypto_bot_api.Migrations
 
             modelBuilder.Entity("crypto_bot_api.Data.TradeRecords", b =>
                 {
-                    b.Property<Guid>("position_uuid")
+                    b.Property<int>("TradeId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("position_uuid");
+                        .HasColumnType("integer")
+                        .HasColumnName("trade_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("TradeId"));
 
                     b.Property<decimal?>("acquired_price")
                         .HasPrecision(18, 8)
@@ -62,6 +67,10 @@ namespace crypto_bot_api.Migrations
                         .HasColumnType("numeric(18,8)")
                         .HasColumnName("percentage_return");
 
+                    b.Property<Guid?>("position_uuid")
+                        .HasColumnType("uuid")
+                        .HasColumnName("position_uuid");
+
                     b.Property<decimal?>("profit_loss")
                         .HasPrecision(18, 8)
                         .HasColumnType("numeric(18,8)")
@@ -72,7 +81,11 @@ namespace crypto_bot_api.Migrations
                         .HasColumnType("numeric(18,8)")
                         .HasColumnName("total_commissions");
 
-                    b.HasKey("position_uuid");
+                    b.Property<DateTime?>("trade_time")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trade_time");
+
+                    b.HasKey("TradeId");
 
                     b.HasIndex("asset_pair", "is_position_closed", "leftover_quantity")
                         .HasFilter("leftover_quantity > 0");
