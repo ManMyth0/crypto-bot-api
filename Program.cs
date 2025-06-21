@@ -25,8 +25,8 @@ builder.Services.AddAuthorization();
 // Register HttpClient with rate limiting
 builder.Services.AddCoinbaseRateLimiting(builder.Configuration);
 
-// Retrieve the connection string from configuration
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// Retrieve the connection string from user secrets
+var connectionString = builder.Configuration["PostgresLocalDatabaseConnection"];
 
 // Register your DbContext to use PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
