@@ -18,9 +18,17 @@ namespace crypto_bot_api.Models.DTOs.Orders
         [RegularExpression("BUY|SELL", ErrorMessage = "side must be either 'BUY' or 'SELL'")]
         public string Side { get; set; } = string.Empty;
 
+        [JsonPropertyName("position_type")]
+        [Required(ErrorMessage = "position_type is required")]
+        [RegularExpression("(?i)^(LONG|SHORT)$", ErrorMessage = "position_type must be either 'LONG' or 'SHORT' (case insensitive)")]
+        public string PositionType { get; set; } = string.Empty;
+
         [JsonPropertyName("order_configuration")]
         [Required(ErrorMessage = "order_configuration is required")]
         public OrderConfigurationDto OrderConfiguration { get; set; } = new OrderConfigurationDto();
+
+        // Helper method to get normalized position type
+        public string GetNormalizedPositionType() => PositionType.ToUpperInvariant();
     }
 
     public class OrderConfigurationDto

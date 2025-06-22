@@ -56,7 +56,7 @@ namespace crypto_bot_api.Tests.Services
             Assert.AreEqual("BUY", result.Trade_Type);
             Assert.AreEqual("BTC-USD", result.Asset_Pair);
             Assert.AreEqual(100.00m, result.Commissions);
-            Assert.AreEqual(51250.00m, result.Acquired_Price); // Weighted average: (50000*1.5 + 55000*0.5)/(1.5 + 0.5)
+            Assert.AreEqual(51250.00m, result.Acquired_Price);
             Assert.AreEqual(2.0m, result.Acquired_Quantity);
             Assert.AreEqual(DateTime.Parse(TestTradeTime), result.Acquired_Time);
         }
