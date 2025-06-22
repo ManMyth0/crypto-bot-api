@@ -6,29 +6,28 @@ namespace crypto_bot_api.Models.DTOs.Orders
     public class CreateOrderRequestDto
     {
         [JsonPropertyName("client_order_id")]
-        [Required(ErrorMessage = "client_order_id is required")]
-        public string ClientOrderId { get; set; } = string.Empty;
+        [Required]
+        public string? ClientOrderId { get; set; }
 
         [JsonPropertyName("product_id")]
-        [Required(ErrorMessage = "product_id is required")]
-        public string ProductId { get; set; } = string.Empty;
+        [Required]
+        public string? ProductId { get; set; }
 
         [JsonPropertyName("side")]
-        [Required(ErrorMessage = "side is required")]
-        [RegularExpression("BUY|SELL", ErrorMessage = "side must be either 'BUY' or 'SELL'")]
-        public string Side { get; set; } = string.Empty;
+        [Required]
+        [RegularExpression("BUY|SELL")]
+        public string? Side { get; set; }
 
         [JsonPropertyName("position_type")]
-        [Required(ErrorMessage = "position_type is required")]
-        [RegularExpression("(?i)^(LONG|SHORT)$", ErrorMessage = "position_type must be either 'LONG' or 'SHORT' (case insensitive)")]
-        public string PositionType { get; set; } = string.Empty;
+        [Required]
+        [RegularExpression("(?i)^(LONG|SHORT)$")]
+        public string? PositionType { get; set; }
 
         [JsonPropertyName("order_configuration")]
-        [Required(ErrorMessage = "order_configuration is required")]
-        public OrderConfigurationDto OrderConfiguration { get; set; } = new OrderConfigurationDto();
+        [Required]
+        public OrderConfigurationDto? OrderConfiguration { get; set; }
 
-        // Helper method to get normalized position type
-        public string GetNormalizedPositionType() => PositionType.ToUpperInvariant();
+        public string GetNormalizedPositionType() => PositionType?.ToUpperInvariant() ?? string.Empty;
     }
 
     public class OrderConfigurationDto
@@ -49,7 +48,8 @@ namespace crypto_bot_api.Models.DTOs.Orders
         public string? BaseSize { get; set; }
 
         [JsonPropertyName("limit_price")]
-        public string LimitPrice { get; set; } = string.Empty;
+        [Required]
+        public string? LimitPrice { get; set; }
 
         [JsonPropertyName("post_only")]
         public bool PostOnly { get; set; }
@@ -64,10 +64,12 @@ namespace crypto_bot_api.Models.DTOs.Orders
         public string? BaseSize { get; set; }
 
         [JsonPropertyName("limit_price")]
-        public string LimitPrice { get; set; } = string.Empty;
+        [Required]
+        public string? LimitPrice { get; set; }
 
         [JsonPropertyName("end_time")]
-        public string EndTime { get; set; } = string.Empty; // RFC3339 Timestamp
+        [Required]
+        public string? EndTime { get; set; }
 
         [JsonPropertyName("post_only")]
         public bool PostOnly { get; set; }
