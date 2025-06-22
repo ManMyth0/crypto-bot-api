@@ -36,8 +36,23 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddCoinbaseHttpClient<ICoinbaseAccountApiClient, CoinbaseAccountApiClient>();
 builder.Services.AddCoinbaseHttpClient<ICoinbaseOrderApiClient, CoinbaseOrderApiClient>();
 
-// Register OrderMonitoringService
-builder.Services.AddScoped<IOrderMonitoringService, OrderMonitoringService>();
+// Register AssembleOrderDetailsService
+builder.Services.AddScoped<IAssembleOrderDetailsService, AssembleOrderDetailsService>();
+
+// Register OrderMonitoringService with its dependencies
+builder.Services.AddScoped<IOrderMonitoringService>(provider =>
+{
+    var orderApiClient = provider.GetRequiredService<ICoinbaseOrderApiClient>();
+    var assembleOrderDetailsService = provider.GetRequiredService<IAssembleOrderDetailsService>();
+    var pollingInterval = TimeSpan.FromSeconds(5); // Poll every 5 seconds
+    var defaultTimeout = TimeSpan.FromMinutes(30); // Default timeout of 30 minutes
+    
+    return new OrderMonitoringService(
+        orderApiClient,
+        assembleOrderDetailsService,
+        pollingInterval,
+        defaultTimeout);
+});
 
 // Add controllers to the container
 builder.Services.AddControllers();
