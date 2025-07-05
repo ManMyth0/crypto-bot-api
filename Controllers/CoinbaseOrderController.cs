@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Models.DTOs.Orders;
 using System.Text.Json.Nodes;
+using crypto_bot_api.Models;
 
 namespace crypto_bot_api.Controllers
 {
@@ -11,27 +12,79 @@ namespace crypto_bot_api.Controllers
     public class CoinbaseOrderController : ControllerBase
     {
         private readonly ICoinbaseOrderApiClient _coinbaseOrderClient;
+        private readonly IAssembleOrderDetailsService _assembleOrderDetails;
+        private readonly IPositionManagementService _positionManager;
         
-        public CoinbaseOrderController(ICoinbaseOrderApiClient coinbaseOrderClient)
+        public CoinbaseOrderController(
+            ICoinbaseOrderApiClient coinbaseOrderClient,
+            IAssembleOrderDetailsService assembleOrderDetails,
+            IPositionManagementService positionManager)
         {
             _coinbaseOrderClient = coinbaseOrderClient;
+            _assembleOrderDetails = assembleOrderDetails;
+            _positionManager = positionManager;
         }
 
         [HttpPost("orders")]
-        public async Task<ActionResult<JsonObject>> CreateOrder([FromBody] CreateOrderRequestDto orderRequest)
+        public async Task<JsonNode?> CreateOrderAsync([FromBody] CreateOrderRequestDto orderRequest)
         {
             try
             {
+                // Create order on Coinbase
                 var result = await _coinbaseOrderClient.CreateOrderAsync(orderRequest);
+                
+                // Get order details including fills
+                var orderId = result["order_id"]?.GetValue<string>();
+                if (string.IsNullOrEmpty(orderId))
+                    return result;
+
+                var fillsResult = await _coinbaseOrderClient.ListOrderFillsAsync(new ListOrderFillsRequestDto 
+                { 
+                    OrderId = orderId 
+                });
+
+                var fills = fillsResult["fills"]?.AsArray();
+                if (fills == null || fills.Count == 0)
+                    return result;
+
+                // Get the size from the order configuration
+                decimal? orderSize = null;
+                if (orderRequest.OrderConfiguration?.LimitLimitGtc != null)
+                {
+                    _ = decimal.TryParse(orderRequest.OrderConfiguration.LimitLimitGtc.BaseSize, out decimal size);
+                    orderSize = size;
+                }
+                else if (orderRequest.OrderConfiguration?.LimitLimitGtd != null)
+                {
+                    _ = decimal.TryParse(orderRequest.OrderConfiguration.LimitLimitGtd.BaseSize, out decimal size);
+                    orderSize = size;
+                }
+
+                // Assemble order details
+                var orderDetails = _assembleOrderDetails.AssembleFromFills(
+                    orderId,
+                    fills,
+                    result["status"]?.GetValue<string>(),
+                    orderSize);
+
+                if (orderDetails == null)
+                    return result;
+
+                // Create or update position based on order type
+                if (orderRequest.PositionId.HasValue)
+                {
+                    await _positionManager.UpdatePositionFromClosingOrderAsync(orderDetails, orderRequest.PositionId.Value);
+                }
+                else
+                {
+                    await _positionManager.CreatePositionFromOrderAsync(orderDetails);
+                }
+
                 return result;
             }
-            catch (CoinbaseApiException ex)
+            catch (CoinbaseApiException)
             {
-                return StatusCode(502, new { error = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = ex.Message });
+                throw;
             }
         }
 

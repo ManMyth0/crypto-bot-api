@@ -39,6 +39,10 @@ builder.Services.AddCoinbaseHttpClient<ICoinbaseOrderApiClient, CoinbaseOrderApi
 // Register AssembleOrderDetailsService
 builder.Services.AddScoped<IAssembleOrderDetailsService, AssembleOrderDetailsService>();
 
+// Register Position Management Services
+builder.Services.AddSingleton<TradeMetricsCalculator>();
+builder.Services.AddScoped<IPositionManagementService, PositionManagementService>();
+
 // Register OrderMonitoringService with its dependencies
 builder.Services.AddScoped<IOrderMonitoringService>(provider =>
 {

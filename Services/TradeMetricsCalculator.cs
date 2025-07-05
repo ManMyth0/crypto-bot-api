@@ -7,6 +7,8 @@ namespace crypto_bot_api.Services
         decimal CalculateTotalCommission(JsonArray fills);
         decimal CalculateTotalPrice(JsonArray fills);
         decimal CalculateTotalSize(JsonArray fills);
+        decimal CalculateProfitLoss(bool isLong, decimal quantity, decimal entryPrice, decimal exitPrice);
+        decimal CalculatePercentageReturn(bool isLong, decimal entryPrice, decimal exitPrice);
     }
 
     public class TradeMetricsCalculator : ITradeMetricsCalculator
@@ -14,14 +16,12 @@ namespace crypto_bot_api.Services
         public decimal CalculateTotalCommission(JsonArray fills)
         {
             decimal totalCommission = 0m;
-            foreach (var fillItem in fills)
+            foreach (var fill in fills)
             {
-                if (fillItem?.AsObject() is JsonObject fill)
+                var commissionStr = fill?["commission"]?.GetValue<string>();
+                if (decimal.TryParse(commissionStr, out decimal commission))
                 {
-                    if (decimal.TryParse(fill["commission"]?.GetValue<string>(), out decimal commission))
-                    {
-                        totalCommission += commission;
-                    }
+                    totalCommission += commission;
                 }
             }
             return totalCommission;
@@ -31,35 +31,61 @@ namespace crypto_bot_api.Services
         {
             decimal totalPrice = 0m;
             decimal totalSize = 0m;
-            foreach (var fillItem in fills)
+
+            foreach (var fill in fills)
             {
-                if (fillItem?.AsObject() is JsonObject fill)
+                var priceStr = fill?["price"]?.GetValue<string>();
+                var sizeStr = fill?["size"]?.GetValue<string>();
+
+                if (decimal.TryParse(priceStr, out decimal price) &&
+                    decimal.TryParse(sizeStr, out decimal size))
                 {
-                    if (decimal.TryParse(fill["price"]?.GetValue<string>(), out decimal price) &&
-                        decimal.TryParse(fill["size"]?.GetValue<string>(), out decimal size))
-                    {
-                        totalPrice += price * size;
-                        totalSize += size;
-                    }
+                    totalPrice += price * size;
+                    totalSize += size;
                 }
             }
+
             return totalSize > 0 ? totalPrice / totalSize : 0m;
         }
 
         public decimal CalculateTotalSize(JsonArray fills)
         {
             decimal totalSize = 0m;
-            foreach (var fillItem in fills)
+            foreach (var fill in fills)
             {
-                if (fillItem?.AsObject() is JsonObject fill)
+                var sizeStr = fill?["size"]?.GetValue<string>();
+                if (decimal.TryParse(sizeStr, out decimal size))
                 {
-                    if (decimal.TryParse(fill["size"]?.GetValue<string>(), out decimal size))
-                    {
-                        totalSize += size;
-                    }
+                    totalSize += size;
                 }
             }
             return totalSize;
+        }
+
+        public decimal CalculateProfitLoss(bool isLong, decimal quantity, decimal entryPrice, decimal exitPrice)
+        {
+            if (isLong)
+            {
+                return (exitPrice - entryPrice) * quantity;
+            }
+            else
+            {
+                return (entryPrice - exitPrice) * quantity;
+            }
+        }
+
+        public decimal CalculatePercentageReturn(bool isLong, decimal entryPrice, decimal exitPrice)
+        {
+            if (entryPrice == 0) return 0m;
+
+            if (isLong)
+            {
+                return ((exitPrice - entryPrice) / entryPrice) * 100m;
+            }
+            else
+            {
+                return ((entryPrice - exitPrice) / entryPrice) * 100m;
+            }
         }
     }
 } 

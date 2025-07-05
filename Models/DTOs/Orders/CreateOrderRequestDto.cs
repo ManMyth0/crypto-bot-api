@@ -27,6 +27,9 @@ namespace crypto_bot_api.Models.DTOs.Orders
         [Required]
         public OrderConfigurationDto? OrderConfiguration { get; set; }
 
+        // Optional position ID for closing trades
+        public Guid? PositionId { get; set; }
+
         public string GetNormalizedPositionType() => PositionType?.ToUpperInvariant() ?? string.Empty;
     }
 
