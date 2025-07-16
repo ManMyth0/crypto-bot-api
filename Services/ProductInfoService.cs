@@ -24,7 +24,7 @@ namespace crypto_bot_api.Services
         private readonly AppDbContext _dbContext;
         private readonly HttpClient _httpClient;
         private readonly ILogger<ProductInfoService> _logger;
-        private const string COINBASE_PRODUCTS_URL = "https://api.coinbase.com/api/v3/brokerage/products";
+        private const string COINBASE_PRODUCTS_URL = "https://api.exchange.coinbase.com/products";
         private static readonly TimeSpan REFRESH_THRESHOLD = TimeSpan.FromHours(24);
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
@@ -97,15 +97,15 @@ namespace crypto_bot_api.Services
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
-                var productsResponse = JsonSerializer.Deserialize<CoinbaseProductsResponse>(content, _jsonOptions);
+                var products = JsonSerializer.Deserialize<List<CoinbaseProduct>>(content, _jsonOptions);
 
-                if (productsResponse?.Products == null || !productsResponse.Products.Any())
+                if (products == null || !products.Any())
                 {
                     throw new InvalidOperationException("No products returned from Coinbase API");
                 }
 
                 var now = DateTime.UtcNow;
-                foreach (var product in productsResponse.Products)
+                foreach (var product in products)
                 {
                     if (string.IsNullOrEmpty(product.Id))
                     {
@@ -179,11 +179,6 @@ namespace crypto_bot_api.Services
         {
             if (string.IsNullOrEmpty(value)) return 0m;
             return decimal.TryParse(value, out decimal result) ? result : 0m;
-        }
-
-        private class CoinbaseProductsResponse
-        {
-            public List<CoinbaseProduct>? Products { get; set; }
         }
 
         private class CoinbaseProduct

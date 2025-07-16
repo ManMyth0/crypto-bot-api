@@ -66,31 +66,28 @@ namespace crypto_bot_api.Tests.Services
         public async Task GetProductInfoAsync_ProductNotFound_RefreshesFromApi()
         {
             // Arrange
-            var mockResponse = new
+            var mockResponse = new[]
             {
-                products = new[]
+                new
                 {
-                    new
-                    {
-                        product_id = "BTC-USD",
-                        base_currency = "BTC",
-                        quote_currency = "USD",
-                        quote_increment = "0.01",
-                        base_increment = "0.00000001",
-                        display_name = "BTC/USD",
-                        min_market_funds = "10",
-                        margin_enabled = false,
-                        post_only = false,
-                        limit_only = false,
-                        cancel_only = false,
-                        status = "online",
-                        status_message = "",
-                        trading_disabled = false,
-                        fx_stablecoin = false,
-                        max_slippage_percentage = "0.02",
-                        auction_mode = false,
-                        high_bid_limit_percentage = ""
-                    }
+                    product_id = "BTC-USD",
+                    base_currency = "BTC",
+                    quote_currency = "USD",
+                    quote_increment = "0.01",
+                    base_increment = "0.00000001",
+                    display_name = "BTC/USD",
+                    min_market_funds = "10",
+                    margin_enabled = false,
+                    post_only = false,
+                    limit_only = false,
+                    cancel_only = false,
+                    status = "online",
+                    status_message = "",
+                    trading_disabled = false,
+                    fx_stablecoin = false,
+                    max_slippage_percentage = "0.02",
+                    auction_mode = false,
+                    high_bid_limit_percentage = ""
                 }
             };
 
@@ -169,31 +166,28 @@ namespace crypto_bot_api.Tests.Services
             await _dbContext.ProductInfo.AddAsync(staleProduct);
             await _dbContext.SaveChangesAsync();
 
-            var mockResponse = new
+            var mockResponse = new[]
             {
-                products = new[]
+                new
                 {
-                    new
-                    {
-                        product_id = "BTC-USD",
-                        base_currency = "BTC",
-                        quote_currency = "USD",
-                        quote_increment = "0.01",
-                        base_increment = "0.00000002", // Updated value
-                        display_name = "BTC/USD",
-                        min_market_funds = "15", // Updated value
-                        margin_enabled = false,
-                        post_only = false,
-                        limit_only = false,
-                        cancel_only = false,
-                        status = "online",
-                        status_message = "",
-                        trading_disabled = false,
-                        fx_stablecoin = false,
-                        max_slippage_percentage = "0.02",
-                        auction_mode = false,
-                        high_bid_limit_percentage = ""
-                    }
+                    product_id = "BTC-USD",
+                    base_currency = "BTC",
+                    quote_currency = "USD",
+                    quote_increment = "0.01",
+                    base_increment = "0.00000002", // Updated value
+                    display_name = "BTC/USD",
+                    min_market_funds = "15", // Updated value
+                    margin_enabled = false,
+                    post_only = false,
+                    limit_only = false,
+                    cancel_only = false,
+                    status = "online",
+                    status_message = "",
+                    trading_disabled = false,
+                    fx_stablecoin = false,
+                    max_slippage_percentage = "0.02",
+                    auction_mode = false,
+                    high_bid_limit_percentage = ""
                 }
             };
 
