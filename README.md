@@ -4,6 +4,11 @@ Currently an API service that integrates with the Coinbase Advanced Trade API to
 
 ## Features
 
+- Position Management System
+  - Track open and closed positions
+  - Calculate P&L and commission tracking
+  - Support for partial position closure
+  - Filtered indexes for efficient position queries
 - Structured responses using DTOs
 - Retrieve account information from Coinbase
 - Support for finding accounts with positive balances
@@ -16,23 +21,15 @@ Currently an API service that integrates with the Coinbase Advanced Trade API to
 
 - .NET 9.0 or higher
 - Coinbase Advanced Trade API credentials (API Key ID and Secret)
+- PostgreSQL database
 
 ### Configuration
 
-1. Create an `appsettings.json` file with the following structure:
+The API uses user secrets for configuration. You'll need to set up the following secrets:
 
 ```json
 {
-  "ConnectionStrings": {
-  "DefaultConnection": "Host=localhost;Port=5432;Database=YOUR_POSTGRES_DATABASE;Username=postgres;Password=YOUR_POSTGRES_DATABASE_PASSWORD"
-  },
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*",
+  "PostgresLocalDatabaseConnection": "Host=localhost;Port=5432;Database=YOUR_POSTGRES_DATABASE;Username=postgres;Password=YOUR_POSTGRES_DATABASE_PASSWORD",
   "CoinbaseApi": {
     "baseUrl": "https://api.coinbase.com",
     "ApiKeyId": "YOUR_API_KEY_ID",
@@ -63,7 +60,7 @@ The API will be available at `http://localhost:5294` or whatever your local host
 - `GET /api/CoinbaseAccount/account/{accountId}` - Get details for a specific account
 
 ### Order Endpoints
-- `POST /api/CoinbaseOrder/orders` - Create an order (buy or sell) by specifying the "side" property in the request body
+- `POST /api/CoinbaseOrder/orders` - Create an order with optional position tracking
 - `GET /api/CoinbaseOrder/historical/fills` - Get historical fill information for orders with optional filtering
 
 ## Order Request Format
@@ -72,6 +69,7 @@ The API will be available at `http://localhost:5294` or whatever your local host
     "product_id": "BTC-USD",
     "side": "BUY",  // or "SELL"
     "client_order_id": "optional-unique-id", // Auto-generated through the GenerateCoinbaseClientOrderId Utility
+    "position_id": "optional-uuid", // For closing trades. Omit for opening new positions
     "order_configuration": {
         "limit_limit_gtc": {
             "base_size": "0.001",
@@ -81,6 +79,23 @@ The API will be available at `http://localhost:5294` or whatever your local host
     }
 }
 ```
+
+## Database Schema
+
+### Position Management Tables
+
+- `Trade_Records` - Tracks overall position status and P&L
+  - UUID-based position tracking
+  - Filtered indexes for open positions
+  - Decimal(18,8) precision for crypto values
+
+- `Opening_Trades` - Initial position establishment
+  - Links to Trade_Records
+  - Tracks entry price and quantity
+
+- `Closing_Trades` - Position closure tracking
+  - Links to both Trade_Records and Opening_Trades
+  - Supports partial position closure
 
 ## Supported Order Types
 - `limit_limit_gtc` - Good Till Canceled limit orders (GTC)
