@@ -73,8 +73,7 @@ The API will be available at `http://localhost:5294` or whatever your local host
     "order_configuration": {
         "limit_limit_gtc": {
             "base_size": "0.001",
-            "limit_price": "20000",
-            "post_only": false
+            "limit_price": "20000"
         }
     }
 }

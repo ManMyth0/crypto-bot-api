@@ -20,8 +20,7 @@ namespace crypto_bot_api.Tests.Services
                     LimitLimitGtc = new LimitLimitGtcDto
                     {
                         BaseSize = "0.001",
-                        LimitPrice = "50000.00",
-                        PostOnly = false
+                        LimitPrice = "50000.00"
                     }
                 }
             };

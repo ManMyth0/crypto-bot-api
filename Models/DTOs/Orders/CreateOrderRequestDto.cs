@@ -53,9 +53,6 @@ namespace crypto_bot_api.Models.DTOs.Orders
         [JsonPropertyName("limit_price")]
         [Required]
         public string? LimitPrice { get; set; }
-
-        [JsonPropertyName("post_only")]
-        public bool PostOnly { get; set; }
     }
 
     public class LimitLimitGtdDto
@@ -73,8 +70,5 @@ namespace crypto_bot_api.Models.DTOs.Orders
         [JsonPropertyName("end_time")]
         [Required]
         public string? EndTime { get; set; }
-
-        [JsonPropertyName("post_only")]
-        public bool PostOnly { get; set; }
     }
 } 
