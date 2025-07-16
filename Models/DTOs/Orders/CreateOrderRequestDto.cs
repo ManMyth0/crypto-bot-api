@@ -35,6 +35,9 @@ namespace crypto_bot_api.Models.DTOs.Orders
 
     public class OrderConfigurationDto
     {
+        [JsonPropertyName("market_market")]
+        public MarketMarketConfig? MarketMarket { get; set; }
+
         [JsonPropertyName("limit_limit_gtc")]
         public LimitLimitGtcDto? LimitLimitGtc { get; set; }
 

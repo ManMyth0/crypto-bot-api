@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
+using crypto_bot_api.Models;
 
 namespace crypto_bot_api.Data
 {
@@ -13,6 +14,7 @@ namespace crypto_bot_api.Data
         public DbSet<TradeRecords> TradeRecords { get; set; }
         public DbSet<OpeningTrades> OpeningTrades { get; set; }
         public DbSet<ClosingTrades> ClosingTrades { get; set; }
+        public DbSet<ProductInfo> ProductInfo { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -84,6 +86,13 @@ namespace crypto_bot_api.Data
                     .HasForeignKey(e => e.opening_trade_id)
                     .HasConstraintName("FK_Closing_Trades_Opening_Trades_opening_trade_id");
             });
+
+            modelBuilder.Entity<ProductInfo>()
+                .HasKey(p => p.Id);
+
+            modelBuilder.Entity<ProductInfo>()
+                .HasIndex(p => p.ProductId)
+                .IsUnique();
         }
     }
 

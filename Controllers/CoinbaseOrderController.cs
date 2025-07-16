@@ -14,15 +14,18 @@ namespace crypto_bot_api.Controllers
         private readonly ICoinbaseOrderApiClient _coinbaseOrderClient;
         private readonly IAssembleOrderDetailsService _assembleOrderDetails;
         private readonly IPositionManagementService _positionManager;
+        private readonly IOrderValidationService _orderValidation;
         
         public CoinbaseOrderController(
             ICoinbaseOrderApiClient coinbaseOrderClient,
             IAssembleOrderDetailsService assembleOrderDetails,
-            IPositionManagementService positionManager)
+            IPositionManagementService positionManager,
+            IOrderValidationService orderValidation)
         {
             _coinbaseOrderClient = coinbaseOrderClient;
             _assembleOrderDetails = assembleOrderDetails;
             _positionManager = positionManager;
+            _orderValidation = orderValidation;
         }
 
         [HttpPost("orders")]
@@ -30,6 +33,9 @@ namespace crypto_bot_api.Controllers
         {
             try
             {
+                // Validate order before submitting
+                await _orderValidation.ValidateOrderAsync(orderRequest);
+
                 // Create order on Coinbase
                 var result = await _coinbaseOrderClient.CreateOrderAsync(orderRequest);
                 

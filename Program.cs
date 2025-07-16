@@ -58,6 +58,10 @@ builder.Services.AddScoped<IOrderMonitoringService>(provider =>
         defaultTimeout);
 });
 
+// Register services
+builder.Services.AddScoped<IOrderValidationService, OrderValidationService>();
+builder.Services.AddScoped<IProductInfoService, ProductInfoService>();
+
 // Add controllers to the container
 builder.Services.AddControllers();
 
