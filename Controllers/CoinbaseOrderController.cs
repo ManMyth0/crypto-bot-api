@@ -15,82 +15,44 @@ namespace crypto_bot_api.Controllers
         private readonly IAssembleOrderDetailsService _assembleOrderDetails;
         private readonly IPositionManagementService _positionManager;
         private readonly IOrderValidationService _orderValidation;
+        private readonly ILogger<CoinbaseOrderController> _logger;
         
         public CoinbaseOrderController(
             ICoinbaseOrderApiClient coinbaseOrderClient,
             IAssembleOrderDetailsService assembleOrderDetails,
             IPositionManagementService positionManager,
-            IOrderValidationService orderValidation)
+            IOrderValidationService orderValidation,
+            ILogger<CoinbaseOrderController> logger)
         {
             _coinbaseOrderClient = coinbaseOrderClient;
             _assembleOrderDetails = assembleOrderDetails;
             _positionManager = positionManager;
             _orderValidation = orderValidation;
+            _logger = logger;
         }
 
         [HttpPost("orders")]
-        public async Task<JsonNode?> CreateOrderAsync([FromBody] CreateOrderRequestDto orderRequest)
+        public async Task<ActionResult<OrderResponse>> CreateOrder(CreateOrderRequestDto orderRequest)
         {
             try
             {
-                // Validate order before submitting
-                await _orderValidation.ValidateOrderAsync(orderRequest);
+                // Validate but don't block
+                var validation = await _orderValidation.ValidateOrderAsync(orderRequest);
 
-                // Create order on Coinbase
+                // Create order regardless of validation
                 var result = await _coinbaseOrderClient.CreateOrderAsync(orderRequest);
-                
-                // Get order details including fills
-                var orderId = result["order_id"]?.GetValue<string>();
-                if (string.IsNullOrEmpty(orderId))
-                    return result;
 
-                var fillsResult = await _coinbaseOrderClient.ListOrderFillsAsync(new ListOrderFillsRequestDto 
-                { 
-                    OrderId = orderId 
+                // Return order result with any validation warnings
+                return Ok(new OrderResponse
+                {
+                    Order = result,
+                    ValidationResult = validation
                 });
-
-                var fills = fillsResult["fills"]?.AsArray();
-                if (fills == null || fills.Count == 0)
-                    return result;
-
-                // Get the size from the order configuration
-                decimal? orderSize = null;
-                if (orderRequest.OrderConfiguration?.LimitLimitGtc != null)
-                {
-                    _ = decimal.TryParse(orderRequest.OrderConfiguration.LimitLimitGtc.BaseSize, out decimal size);
-                    orderSize = size;
-                }
-                else if (orderRequest.OrderConfiguration?.LimitLimitGtd != null)
-                {
-                    _ = decimal.TryParse(orderRequest.OrderConfiguration.LimitLimitGtd.BaseSize, out decimal size);
-                    orderSize = size;
-                }
-
-                // Assemble order details
-                var orderDetails = _assembleOrderDetails.AssembleFromFills(
-                    orderId,
-                    fills,
-                    result["status"]?.GetValue<string>(),
-                    orderSize);
-
-                if (orderDetails == null)
-                    return result;
-
-                // Create or update position based on order type
-                if (orderRequest.PositionId.HasValue)
-                {
-                    await _positionManager.UpdatePositionFromClosingOrderAsync(orderDetails, orderRequest.PositionId.Value);
-                }
-                else
-                {
-                    await _positionManager.CreatePositionFromOrderAsync(orderDetails);
-                }
-
-                return result;
             }
-            catch (CoinbaseApiException)
+            catch (Exception ex)
             {
-                throw;
+                _logger.LogError(ex, "Error creating order");
+                return StatusCode(500, new { Error = "Internal server error" });
             }
         }
 

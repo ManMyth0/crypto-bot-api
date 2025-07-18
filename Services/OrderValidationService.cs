@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using crypto_bot_api.CustomExceptions;
+using crypto_bot_api.Models;
 using crypto_bot_api.Models.DTOs.Orders;
 using Microsoft.Extensions.Logging;
 
@@ -8,7 +8,7 @@ namespace crypto_bot_api.Services
 {
     public interface IOrderValidationService
     {
-        Task ValidateOrderAsync(CreateOrderRequestDto orderRequest);
+        Task<ValidationResult> ValidateOrderAsync(CreateOrderRequestDto orderRequest);
     }
 
     public class OrderValidationService : IOrderValidationService
@@ -24,32 +24,47 @@ namespace crypto_bot_api.Services
             _logger = logger;
         }
 
-        public async Task ValidateOrderAsync(CreateOrderRequestDto orderRequest)
+        public async Task<ValidationResult> ValidateOrderAsync(CreateOrderRequestDto orderRequest)
         {
+            var result = new ValidationResult
+            {
+                ValidationTimestamp = DateTime.UtcNow
+            };
+
             if (orderRequest == null)
             {
-                throw new ArgumentNullException(nameof(orderRequest));
+                result.IsValid = false;
+                result.Warnings.Add("Order request is null");
+                return result;
             }
 
             if (string.IsNullOrEmpty(orderRequest.ProductId))
             {
-                throw new CoinbaseApiException("ProductId is required");
+                result.IsValid = false;
+                result.Warnings.Add("ProductId is required");
+                return result;
             }
 
             var productInfo = await _productInfoService.GetProductInfoAsync(orderRequest.ProductId);
             if (productInfo == null)
             {
-                throw new CoinbaseApiException($"Product {orderRequest.ProductId} not found or unavailable");
+                result.Warnings.Add($"Product {orderRequest.ProductId} not found or unavailable");
+                return result;
             }
 
+            result.ProductId = productInfo.ProductId;
+            result.Status = productInfo.Status;
+            result.TradingDisabled = productInfo.TradingDisabled;
+
+            // Check trading status
             if (productInfo.TradingDisabled || productInfo.Status?.ToLower() == "offline")
             {
-                throw new CoinbaseApiException($"Trading is disabled for {orderRequest.ProductId}");
+                result.Warnings.Add($"Trading may be disabled for {orderRequest.ProductId} (Status: {productInfo.Status}, TradingDisabled: {productInfo.TradingDisabled})");
             }
 
             if (productInfo.Status?.ToLower() == "delisted")
             {
-                throw new CoinbaseApiException($"Product {orderRequest.ProductId} has been delisted");
+                result.Warnings.Add($"Product {orderRequest.ProductId} appears to be delisted");
             }
 
             // Get order size from configuration
@@ -70,24 +85,27 @@ namespace crypto_bot_api.Services
             {
                 if (productInfo.LimitOnly)
                 {
-                    throw new CoinbaseApiException($"Product {orderRequest.ProductId} accepts limit orders only");
+                    result.Warnings.Add($"Product {orderRequest.ProductId} accepts limit orders only");
                 }
                 baseSize = orderRequest.OrderConfiguration.MarketMarket.BaseSize;
                 quoteSize = orderRequest.OrderConfiguration.MarketMarket.QuoteSize;
             }
             else
             {
-                throw new CoinbaseApiException("Invalid order configuration");
+                result.Warnings.Add("Invalid order configuration");
+                return result;
             }
 
             if (string.IsNullOrEmpty(baseSize))
             {
-                throw new CoinbaseApiException("BaseSize is required");
+                result.Warnings.Add("BaseSize is required");
+                return result;
             }
 
             if (string.IsNullOrEmpty(quoteSize))
             {
-                throw new CoinbaseApiException("QuoteSize is required");
+                result.Warnings.Add("QuoteSize is required");
+                return result;
             }
 
             // Validate base_size increment
@@ -96,13 +114,12 @@ namespace crypto_bot_api.Services
                 var remainder = baseSizeValue % productInfo.BaseIncrement;
                 if (remainder != 0)
                 {
-                    throw new CoinbaseApiException(
-                        $"Invalid base_size. Must be an increment of {productInfo.BaseIncrement}");
+                    result.Warnings.Add($"Base size {baseSizeValue} is not an increment of {productInfo.BaseIncrement}");
                 }
             }
             else
             {
-                throw new CoinbaseApiException("Invalid base_size format");
+                result.Warnings.Add("Invalid base_size format");
             }
 
             // Validate minimum order value
@@ -110,16 +127,18 @@ namespace crypto_bot_api.Services
             {
                 if (quoteSizeValue < productInfo.MinMarketFunds)
                 {
-                    throw new CoinbaseApiException(
-                        $"Order value {quoteSizeValue} is below minimum {productInfo.MinMarketFunds}");
+                    result.Warnings.Add($"Order value {quoteSizeValue} is below minimum {productInfo.MinMarketFunds}");
                 }
             }
             else
             {
-                throw new CoinbaseApiException("Invalid quote_size format");
+                result.Warnings.Add("Invalid quote_size format");
             }
 
-            _logger.LogInformation($"Order validation passed for {orderRequest.ProductId}");
+            _logger.LogInformation("Order validation completed for {ProductId} with {WarningCount} warnings", 
+                orderRequest.ProductId, result.Warnings.Count);
+
+            return result;
         }
     }
 } 

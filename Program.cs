@@ -65,18 +65,28 @@ builder.Services.AddScoped<IProductInfoService, ProductInfoService>();
 // Add controllers to the container
 builder.Services.AddControllers();
 
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
 
-// Development environment setup
+// Initialize product info
+using (var scope = app.Services.CreateScope())
+{
+    var productInfoService = scope.ServiceProvider.GetRequiredService<IProductInfoService>();
+    await productInfoService.InitializeAsync();
+}
+
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
-
-// Map controllers to endpoints
 app.MapControllers();
 
 app.Run();

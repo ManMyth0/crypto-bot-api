@@ -14,9 +14,10 @@ namespace crypto_bot_api.Services
 {
     public interface IProductInfoService
     {
+        Task InitializeAsync();
         Task<ProductInfo?> GetProductInfoAsync(string productId);
-        Task RefreshProductInfoAsync();
         Task<DateTime> GetLastUpdateTimeAsync(string productId);
+        Task RefreshProductInfoAsync();
     }
 
     public class ProductInfoService : IProductInfoService
@@ -25,10 +26,11 @@ namespace crypto_bot_api.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<ProductInfoService> _logger;
         private const string COINBASE_PRODUCTS_URL = "https://api.exchange.coinbase.com/products";
-        private static readonly TimeSpan REFRESH_THRESHOLD = TimeSpan.FromHours(24);
+        private const int RETRY_DELAY_MS = 5000; // 5 seconds
+        private const int MAX_RETRIES = 3;
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
-            PropertyNameCaseInsensitive = true // This will handle both camelCase and snake_case
+            PropertyNameCaseInsensitive = true
         };
 
         public ProductInfoService(
@@ -39,6 +41,31 @@ namespace crypto_bot_api.Services
             _dbContext = dbContext;
             _httpClient = httpClient;
             _logger = logger;
+        }
+
+        public async Task InitializeAsync()
+        {
+            for (int attempt = 0; attempt <= MAX_RETRIES; attempt++)
+            {
+                try
+                {
+                    await RefreshProductInfoAsync();
+                    _logger.LogInformation("Successfully initialized product information");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    if (attempt == MAX_RETRIES)
+                    {
+                        _logger.LogError(ex, "Failed to initialize product information after {RetryCount} attempts", MAX_RETRIES);
+                        return; // Continue API startup despite failure
+                    }
+
+                    _logger.LogWarning(ex, "Failed to initialize product information (Attempt {Attempt}/{MaxRetries}). Retrying in {Delay}ms...",
+                        attempt + 1, MAX_RETRIES, RETRY_DELAY_MS);
+                    await Task.Delay(RETRY_DELAY_MS);
+                }
+            }
         }
 
         public async Task<ProductInfo?> GetProductInfoAsync(string productId)
@@ -53,9 +80,9 @@ namespace crypto_bot_api.Services
                 productInfo = await _dbContext.ProductInfo
                     .FirstOrDefaultAsync(p => p.ProductId == productId);
             }
-            else if (DateTime.UtcNow - productInfo.LastUpdated > REFRESH_THRESHOLD)
+            else if (DateTime.UtcNow - productInfo.LastUpdated > TimeSpan.FromHours(24))
             {
-                _logger.LogInformation($"Product info for {productId} is older than {REFRESH_THRESHOLD.TotalHours} hours. Refreshing from Coinbase.");
+                _logger.LogInformation($"Product info for {productId} is older than 24 hours. Refreshing from Coinbase.");
                 try
                 {
                     await RefreshProductInfoAsync();
@@ -91,20 +118,24 @@ namespace crypto_bot_api.Services
 
         public async Task RefreshProductInfoAsync()
         {
+            var response = await _httpClient.GetAsync(COINBASE_PRODUCTS_URL);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var products = JsonSerializer.Deserialize<List<CoinbaseProduct>>(content, _jsonOptions);
+
+            if (products == null || !products.Any())
+            {
+                throw new InvalidOperationException("No products returned from Coinbase API");
+            }
+
+            var now = DateTime.UtcNow;
             try
             {
-                var response = await _httpClient.GetAsync(COINBASE_PRODUCTS_URL);
-                response.EnsureSuccessStatusCode();
+                // Clear existing products
+                _dbContext.ProductInfo.RemoveRange(_dbContext.ProductInfo);
 
-                var content = await response.Content.ReadAsStringAsync();
-                var products = JsonSerializer.Deserialize<List<CoinbaseProduct>>(content, _jsonOptions);
-
-                if (products == null || !products.Any())
-                {
-                    throw new InvalidOperationException("No products returned from Coinbase API");
-                }
-
-                var now = DateTime.UtcNow;
+                // Add new products
                 foreach (var product in products)
                 {
                     if (string.IsNullOrEmpty(product.Id))
@@ -113,60 +144,33 @@ namespace crypto_bot_api.Services
                         continue;
                     }
 
-                    var existingProduct = await _dbContext.ProductInfo
-                        .FirstOrDefaultAsync(p => p.ProductId == product.Id);
-
-                    if (existingProduct != null)
+                    await _dbContext.ProductInfo.AddAsync(new ProductInfo
                     {
-                        existingProduct.BaseCurrency = product.BaseCurrency ?? string.Empty;
-                        existingProduct.QuoteCurrency = product.QuoteCurrency ?? string.Empty;
-                        existingProduct.BaseIncrement = ParseDecimalOrDefault(product.BaseIncrement);
-                        existingProduct.QuoteIncrement = ParseDecimalOrDefault(product.QuoteIncrement);
-                        existingProduct.MinMarketFunds = ParseDecimalOrDefault(product.MinMarketFunds);
-                        existingProduct.DisplayName = product.DisplayName ?? string.Empty;
-                        existingProduct.MarginEnabled = product.MarginEnabled;
-                        existingProduct.PostOnly = product.PostOnly;
-                        existingProduct.LimitOnly = product.LimitOnly;
-                        existingProduct.CancelOnly = product.CancelOnly;
-                        existingProduct.Status = product.Status ?? string.Empty;
-                        existingProduct.StatusMessage = product.StatusMessage ?? string.Empty;
-                        existingProduct.TradingDisabled = product.TradingDisabled;
-                        existingProduct.FxStablecoin = product.FxStablecoin;
-                        existingProduct.MaxSlippagePercentage = ParseDecimalOrDefault(product.MaxSlippagePercentage);
-                        existingProduct.AuctionMode = product.AuctionMode;
-                        existingProduct.HighBidLimitPercentage = product.HighBidLimitPercentage ?? string.Empty;
-                        existingProduct.LastUpdated = now;
-                    }
-                    else
-                    {
-                        await _dbContext.ProductInfo.AddAsync(new ProductInfo
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            ProductId = product.Id,
-                            BaseCurrency = product.BaseCurrency ?? string.Empty,
-                            QuoteCurrency = product.QuoteCurrency ?? string.Empty,
-                            BaseIncrement = ParseDecimalOrDefault(product.BaseIncrement),
-                            QuoteIncrement = ParseDecimalOrDefault(product.QuoteIncrement),
-                            MinMarketFunds = ParseDecimalOrDefault(product.MinMarketFunds),
-                            DisplayName = product.DisplayName ?? string.Empty,
-                            MarginEnabled = product.MarginEnabled,
-                            PostOnly = product.PostOnly,
-                            LimitOnly = product.LimitOnly,
-                            CancelOnly = product.CancelOnly,
-                            Status = product.Status ?? string.Empty,
-                            StatusMessage = product.StatusMessage ?? string.Empty,
-                            TradingDisabled = product.TradingDisabled,
-                            FxStablecoin = product.FxStablecoin,
-                            MaxSlippagePercentage = ParseDecimalOrDefault(product.MaxSlippagePercentage),
-                            AuctionMode = product.AuctionMode,
-                            HighBidLimitPercentage = product.HighBidLimitPercentage ?? string.Empty,
-                            LastUpdated = now
-                        });
-                    }
+                        Id = Guid.NewGuid().ToString(),
+                        ProductId = product.Id,
+                        BaseCurrency = product.BaseCurrency ?? string.Empty,
+                        QuoteCurrency = product.QuoteCurrency ?? string.Empty,
+                        BaseIncrement = ParseDecimalOrDefault(product.BaseIncrement),
+                        QuoteIncrement = ParseDecimalOrDefault(product.QuoteIncrement),
+                        MinMarketFunds = ParseDecimalOrDefault(product.MinMarketFunds),
+                        DisplayName = product.DisplayName ?? string.Empty,
+                        MarginEnabled = product.MarginEnabled,
+                        PostOnly = product.PostOnly,
+                        LimitOnly = product.LimitOnly,
+                        CancelOnly = product.CancelOnly,
+                        Status = product.Status ?? string.Empty,
+                        StatusMessage = product.StatusMessage ?? string.Empty,
+                        TradingDisabled = product.TradingDisabled,
+                        FxStablecoin = product.FxStablecoin,
+                        MaxSlippagePercentage = ParseDecimalOrDefault(product.MaxSlippagePercentage),
+                        AuctionMode = product.AuctionMode,
+                        HighBidLimitPercentage = product.HighBidLimitPercentage ?? string.Empty,
+                        LastUpdated = now
+                    });
                 }
 
                 await _dbContext.SaveChangesAsync();
-                _logger.LogInformation($"Successfully refreshed product information from Coinbase at {now}");
+                _logger.LogInformation("Successfully refreshed product information at {Timestamp}", now);
             }
             catch (Exception ex)
             {

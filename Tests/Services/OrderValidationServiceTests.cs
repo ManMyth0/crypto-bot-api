@@ -7,6 +7,7 @@ using crypto_bot_api.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System.Linq;
 
 namespace crypto_bot_api.Tests.Services
 {
@@ -65,7 +66,7 @@ namespace crypto_bot_api.Tests.Services
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_ValidOrder_Succeeds()
+        public async Task ValidateOrderAsync_ValidOrder_NoWarnings()
         {
             // Arrange
             var orderRequest = CreateLimitOrderRequest(
@@ -89,13 +90,18 @@ namespace crypto_bot_api.Tests.Services
                 });
 
             // Act
-            await _service.ValidateOrderAsync(orderRequest);
-            // No exception means validation passed
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.IsValid);
+            Assert.AreEqual(0, result.Warnings.Count);
+            Assert.AreEqual("BTC-USD", result.ProductId);
+            Assert.AreEqual("online", result.Status);
+            Assert.IsFalse(result.TradingDisabled);
         }
 
         [TestMethod]
-        [ExpectedException(typeof(CoinbaseApiException))]
-        public async Task ValidateOrderAsync_ProductNotFound_ThrowsException()
+        public async Task ValidateOrderAsync_ProductNotFound_ReturnsWarning()
         {
             // Arrange
             var orderRequest = CreateLimitOrderRequest(
@@ -109,11 +115,14 @@ namespace crypto_bot_api.Tests.Services
                 .ReturnsAsync((ProductInfo?)null);
 
             // Act
-            await _service.ValidateOrderAsync(orderRequest);
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("not found")));
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_TradingDisabled_ThrowsException()
+        public async Task ValidateOrderAsync_TradingDisabled_ReturnsWarning()
         {
             // Arrange
             var orderRequest = CreateLimitOrderRequest(
@@ -131,18 +140,21 @@ namespace crypto_bot_api.Tests.Services
                     Status = "offline",
                     StatusMessage = "",
                     DisplayName = "BTC/USD",
-                    HighBidLimitPercentage = ""
+                    HighBidLimitPercentage = "",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m
                 });
 
-            // Act & Assert
-            var exception = await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
-                () => _service.ValidateOrderAsync(orderRequest)
-            );
-            StringAssert.Contains(exception.Message, "Trading is disabled");
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("disabled")));
+            Assert.IsTrue(result.TradingDisabled);
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_BelowMinimumFunds_ThrowsException()
+        public async Task ValidateOrderAsync_BelowMinimumFunds_ReturnsWarning()
         {
             // Arrange
             var orderRequest = CreateLimitOrderRequest(
@@ -165,15 +177,15 @@ namespace crypto_bot_api.Tests.Services
                     BaseIncrement = 0.00001m
                 });
 
-            // Act & Assert
-            var exception = await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
-                () => _service.ValidateOrderAsync(orderRequest)
-            );
-            StringAssert.Contains(exception.Message, "below minimum");
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("below minimum")));
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_InvalidBaseIncrement_ThrowsException()
+        public async Task ValidateOrderAsync_InvalidBaseIncrement_ReturnsWarning()
         {
             // Arrange
             var orderRequest = CreateLimitOrderRequest(
@@ -196,15 +208,15 @@ namespace crypto_bot_api.Tests.Services
                     TradingDisabled = false
                 });
 
-            // Act & Assert
-            var exception = await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
-                () => _service.ValidateOrderAsync(orderRequest)
-            );
-            StringAssert.Contains(exception.Message, "Must be an increment of");
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("increment")));
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_ProductDelisted_ThrowsException()
+        public async Task ValidateOrderAsync_ProductDelisted_ReturnsWarning()
         {
             // Arrange
             var orderRequest = CreateLimitOrderRequest(
@@ -222,18 +234,20 @@ namespace crypto_bot_api.Tests.Services
                     StatusMessage = "",
                     DisplayName = "BTC/USD",
                     HighBidLimitPercentage = "",
-                    TradingDisabled = false
+                    TradingDisabled = false,
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m
                 });
 
-            // Act & Assert
-            var exception = await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
-                () => _service.ValidateOrderAsync(orderRequest)
-            );
-            StringAssert.Contains(exception.Message.ToLower(), "delisted");
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.ToLower().Contains("delisted")));
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_LimitOnlyProduct_NonLimitOrder_ThrowsException()
+        public async Task ValidateOrderAsync_LimitOnlyProduct_NonLimitOrder_ReturnsWarning()
         {
             // Arrange
             var orderRequest = CreateMarketOrderRequest(
@@ -251,14 +265,16 @@ namespace crypto_bot_api.Tests.Services
                     StatusMessage = "",
                     DisplayName = "BTC/USD",
                     HighBidLimitPercentage = "",
-                    TradingDisabled = false
+                    TradingDisabled = false,
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m
                 });
 
-            // Act & Assert
-            var exception = await Assert.ThrowsExceptionAsync<CoinbaseApiException>(
-                () => _service.ValidateOrderAsync(orderRequest)
-            );
-            StringAssert.Contains(exception.Message.ToLower(), "limit orders only");
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.ToLower().Contains("limit orders only")));
         }
     }
 } 
