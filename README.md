@@ -184,12 +184,22 @@ Example asset-pair:
 
 - C#
 - .NET 9.0
-- MSTest for unit testing
-- Moq for mocking in tests
-- Coinbase Advanced Trade API
-- PostgreSQL with Entity Framework Core 9.0.4
-- System.Text.Json for JSON serialization/deserialization
-- NSec.Cryptography (25.4.0) for cryptographic operations
-- System.IdentityModel.Tokens.Jwt (8.9.0) for JWT handling
-- Microsoft.IdentityModel.Tokens (8.9.0) for token management
-- BouncyCastle.NetCore (2.2.1) for Ed25519 cryptographic signing
+- Testing Framework:
+  - Moq (4.20.72) for mocking
+  - Microsoft.NET.Test.Sdk (17.12.0)
+  - MSTest.TestAdapter/Framework (3.6.4)
+- Database:
+  - PostgreSQL with Npgsql.EntityFrameworkCore.PostgreSQL (9.0.4)
+  - Entity Framework Core (9.0.4) for:
+    - Design (migrations)
+    - InMemory (unit testing)
+    - Sqlite (integration testing)
+- API & Authentication:
+  - Coinbase Advanced Trade API
+  - Microsoft.IdentityModel.Tokens (8.9.0)
+  - System.IdentityModel.Tokens.Jwt (8.9.0)
+  - BouncyCastle.NetCore (2.2.1) for Ed25519 JWT signing
+  - NSec.Cryptography (25.4.0) for cryptographic operations
+- Documentation:
+  - Swashbuckle.AspNetCore (9.0.3)
+  - Microsoft.AspNetCore.OpenApi (9.0.4)
