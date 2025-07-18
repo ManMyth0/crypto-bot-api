@@ -144,7 +144,7 @@ Warnings are provided for:
 
 - `ProductInfo` - Stores detailed configuration and trading parameters for each asset-pair available on Coinbase. 
   
-  ## Which help us with:
+  #### Which help us with:
   - Unique indexing on ProductId for fast lookups
   - Storing trading status and restrictions
   - Tracking base/quote increments and minimum funds
