@@ -9,6 +9,16 @@ Currently an API service that integrates with the Coinbase Advanced Trade API to
   - Calculate P&L and commission tracking
   - Support for partial position closure
   - Filtered indexes for efficient position queries
+- Product Information Management
+  - Efficient caching with 24-hour refresh
+  - Automatic startup initialization
+  - Graceful handling of API failures
+  - Real-time product status tracking
+- Order Validation System
+  - Comprehensive pre-trade validation
+  - Trading status verification
+  - Base size and minimum funds validation
+  - Warning-based validation responses
 - Structured responses using DTOs
 - Retrieve account information from Coinbase
 - Support for finding accounts with positive balances
@@ -62,6 +72,40 @@ The API will be available at `http://localhost:5294` or whatever your local host
 ### Order Endpoints
 - `POST /api/CoinbaseOrder/orders` - Create an order with optional position tracking
 - `GET /api/CoinbaseOrder/historical/fills` - Get historical fill information for orders with optional filtering
+
+## Order Validation
+
+The API performs comprehensive validation before submitting orders to Coinbase:
+
+### Product Status Validation
+- Checks if trading is disabled for the product
+- Verifies product status (online/offline/delisted)
+- Validates product-specific restrictions (limit-only, etc.)
+
+### Order Size Validation
+- Validates base size against product's base_increment
+- Ensures order meets minimum funds requirement
+- Checks quote size formatting and validity
+
+### Validation Response
+Instead of failing with errors, the API returns a ValidationResult containing:
+```json
+{
+    "isValid": true,
+    "warnings": [],
+    "validationTimestamp": "2024-03-21T10:00:00Z",
+    "productId": "BTC-USD",
+    "status": "online",
+    "tradingDisabled": false
+}
+```
+
+Warnings are provided for:
+- Trading disabled or offline products
+- Delisted products
+- Invalid base size increments
+- Orders below minimum funds
+- Limit-only product restrictions
 
 ## Order Request Format
 ```json
