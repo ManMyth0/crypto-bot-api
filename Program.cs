@@ -1,7 +1,7 @@
 using crypto_bot_api.Data;
 using crypto_bot_api.Services;
-using crypto_bot_api.Services.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using crypto_bot_api.Services.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 

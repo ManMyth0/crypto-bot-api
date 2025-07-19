@@ -1,6 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using crypto_bot_api.Models.DTOs.Orders;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.ComponentModel.DataAnnotations;
 
 namespace crypto_bot_api.Tests.Services
 {

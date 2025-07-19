@@ -1,8 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using crypto_bot_api.Models;
 using crypto_bot_api.Models.DTOs.Orders;
-using Microsoft.Extensions.Logging;
 
 namespace crypto_bot_api.Services
 {

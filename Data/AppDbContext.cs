@@ -1,7 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using crypto_bot_api.Models;
 using Microsoft.EntityFrameworkCore;
-using crypto_bot_api.Models;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace crypto_bot_api.Data
 {

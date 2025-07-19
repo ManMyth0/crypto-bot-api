@@ -4,7 +4,6 @@ using System.Text.Json.Nodes;
 using crypto_bot_api.Helpers;
 using crypto_bot_api.Utilities;
 using crypto_bot_api.Models.DTOs.Orders;
-using Microsoft.Extensions.Configuration;
 
 namespace crypto_bot_api.Services
 {

@@ -1,9 +1,8 @@
 using crypto_bot_api.Data;
+using Microsoft.Data.Sqlite;
 using crypto_bot_api.Models;
 using crypto_bot_api.Services;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace crypto_bot_api.Tests.Services
 {

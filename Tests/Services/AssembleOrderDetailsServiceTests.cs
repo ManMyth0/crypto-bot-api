@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using crypto_bot_api.Models;
 using crypto_bot_api.Services;
 
 namespace crypto_bot_api.Tests.Services

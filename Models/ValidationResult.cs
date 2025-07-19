@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace crypto_bot_api.Models
 {
     public class ValidationResult

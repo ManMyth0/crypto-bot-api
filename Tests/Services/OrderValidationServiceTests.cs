@@ -1,13 +1,7 @@
-using System;
-using System.Threading.Tasks;
-using crypto_bot_api.CustomExceptions;
-using crypto_bot_api.Models;
-using crypto_bot_api.Models.DTOs.Orders;
-using crypto_bot_api.Services;
-using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using System.Linq;
+using crypto_bot_api.Models;
+using crypto_bot_api.Services;
+using crypto_bot_api.Models.DTOs.Orders;
 
 namespace crypto_bot_api.Tests.Services
 {

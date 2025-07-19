@@ -1,10 +1,5 @@
-using System;
-using System.IO;
 using crypto_bot_api.Data;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace crypto_bot_api.Tests.Services
 {

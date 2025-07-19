@@ -1,10 +1,9 @@
 using Moq;
 using System.Net;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using crypto_bot_api.Services;
-using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Tests.Utilities;
+using crypto_bot_api.CustomExceptions;
 
 namespace crypto_bot_api.Tests.Services
 {

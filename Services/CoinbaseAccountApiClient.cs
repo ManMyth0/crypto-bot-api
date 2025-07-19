@@ -1,8 +1,7 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using crypto_bot_api.Helpers;
+using System.Text.Json.Nodes;
 using crypto_bot_api.CustomExceptions;
-using Microsoft.Extensions.Configuration;
 
 namespace crypto_bot_api.Services
 {

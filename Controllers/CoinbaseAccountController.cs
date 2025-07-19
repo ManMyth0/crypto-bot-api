@@ -1,8 +1,7 @@
-using System.Net.Mime;
+using System.Text.Json.Nodes;
 using crypto_bot_api.Services;
 using Microsoft.AspNetCore.Mvc;
 using crypto_bot_api.CustomExceptions;
-using System.Text.Json.Nodes;
 
 namespace crypto_bot_api.Controllers
 {

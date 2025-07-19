@@ -1,16 +1,9 @@
 using Moq;
-using System;
 using System.Net;
 using Moq.Protected;
-using System.Net.Http;
-using System.Threading.Tasks;
 using crypto_bot_api.Data;
-using crypto_bot_api.Models;
 using crypto_bot_api.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace crypto_bot_api.Tests.Services
 {

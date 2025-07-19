@@ -1,9 +1,8 @@
+using System.Text.Json.Nodes;
 using crypto_bot_api.Services;
 using Microsoft.AspNetCore.Mvc;
 using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Models.DTOs.Orders;
-using System.Text.Json.Nodes;
-using crypto_bot_api.Models;
 
 namespace crypto_bot_api.Controllers
 {

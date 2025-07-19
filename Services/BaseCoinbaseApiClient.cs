@@ -1,13 +1,10 @@
 // Base class for Coinbase API clients
 using System.Text;
-using System.Net.Http;
 using System.Text.Json;
 using crypto_bot_api.Helpers;
-using System.Threading.Tasks;
 using System.Net.Http.Headers;
-using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Models.Responses;
-using Microsoft.Extensions.Configuration;
+using crypto_bot_api.CustomExceptions;
 
 namespace crypto_bot_api.Services
 {

@@ -1,22 +1,8 @@
 using Moq;
 using System.Net;
 using Moq.Protected;
-using System.Net.Http;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using crypto_bot_api.Services;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using crypto_bot_api.Tests.Utilities;
-using crypto_bot_api.CustomExceptions;
-using crypto_bot_api.Models.DTOs.Orders;
 using crypto_bot_api.Services.RateLimiting;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Linq;
 
 namespace crypto_bot_api.Tests.Services
 {

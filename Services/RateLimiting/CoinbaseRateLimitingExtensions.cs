@@ -1,6 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-
 namespace crypto_bot_api.Services.RateLimiting
 {
     public static class CoinbaseRateLimitingExtensions
