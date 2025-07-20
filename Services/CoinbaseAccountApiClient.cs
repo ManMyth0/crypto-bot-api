@@ -1,6 +1,7 @@
 using System.Text.Json;
 using crypto_bot_api.Helpers;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Options;
 using crypto_bot_api.CustomExceptions;
 
 namespace crypto_bot_api.Services
@@ -9,8 +10,11 @@ namespace crypto_bot_api.Services
     {
         private readonly new Ed25519JwtHelper _jwtHelper;
 
-        public CoinbaseAccountApiClient(HttpClient client, IConfiguration config)
-            : base(client, config)
+        public CoinbaseAccountApiClient(
+            HttpClient client, 
+            IConfiguration config,
+            IOptions<SandboxConfiguration> sandboxConfig)
+            : base(client, config, sandboxConfig)
         {
             // Create Ed25519 JWT helper
             _jwtHelper = new Ed25519JwtHelper(_apiKeyId, _apiSecret);

@@ -2,6 +2,7 @@ using crypto_bot_api.Data;
 using crypto_bot_api.Services;
 using Microsoft.EntityFrameworkCore;
 using crypto_bot_api.Services.RateLimiting;
+using crypto_bot_api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,11 @@ builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
 // Load user secrets before adding services
 builder.Configuration.AddUserSecrets<Program>();
+
+// Configure sandbox mode
+builder.Services.Configure<SandboxConfiguration>(
+    builder.Configuration.GetSection(SandboxConfiguration.ConfigurationSection));
+builder.Services.AddSandboxServices();
 
 // Get configuration values for proper display
 var baseUrl = builder.Configuration["CoinbaseApi:baseUrl"];
@@ -86,6 +92,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Add sandbox middleware before authorization
+app.UseSandboxHeaders();
+
 app.UseAuthorization();
 app.MapControllers();
 

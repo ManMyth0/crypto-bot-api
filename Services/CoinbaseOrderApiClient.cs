@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using crypto_bot_api.Helpers;
 using crypto_bot_api.Utilities;
+using Microsoft.Extensions.Options;
 using crypto_bot_api.Models.DTOs.Orders;
 
 namespace crypto_bot_api.Services
@@ -13,8 +14,11 @@ namespace crypto_bot_api.Services
         private readonly HttpClient _httpClient;
         private new readonly IConfiguration _configuration;
 
-        public CoinbaseOrderApiClient(HttpClient client, IConfiguration config)
-            : base(client, config)
+        public CoinbaseOrderApiClient(
+            HttpClient client, 
+            IConfiguration config,
+            IOptions<SandboxConfiguration> sandboxConfig)
+            : base(client, config, sandboxConfig)
         {
             // Create Ed25519 JWT helper
             _jwtHelper = new Ed25519JwtHelper(_apiKeyId, _apiSecret);

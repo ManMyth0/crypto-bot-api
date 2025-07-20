@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using crypto_bot_api.Helpers;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Options;
 using crypto_bot_api.Models.Responses;
 using crypto_bot_api.CustomExceptions;
 
@@ -16,14 +17,24 @@ namespace crypto_bot_api.Services
         protected readonly string _apiSecret;
         protected readonly IConfiguration _configuration;
         protected readonly Ed25519JwtHelper _jwtHelper;
+        protected readonly bool _isSandbox;  // Add sandbox flag
 
-        protected BaseCoinbaseApiClient(HttpClient client, IConfiguration config)
+        protected BaseCoinbaseApiClient(
+            HttpClient client, 
+            IConfiguration config,
+            IOptions<SandboxConfiguration> sandboxConfig)  // Add sandbox config
         {
             _client = client;
             _configuration = config;
-
-            _baseUrl = config["CoinbaseApi:baseUrl"]
-                ?? throw new ArgumentNullException(nameof(config), "Coinbase API base URL is not configured.");
+            
+            // Set sandbox mode - defaults to false if config is null
+            _isSandbox = sandboxConfig?.Value?.Enabled ?? false;
+            
+            // Choose URL based on sandbox mode
+            _baseUrl = _isSandbox 
+                ? SandboxEndpoints.SandboxBaseUrl 
+                : config["CoinbaseApi:baseUrl"] ?? throw new ArgumentNullException(nameof(config), "Coinbase API base URL is not configured.");
+                
             _apiKeyId = config["CoinbaseApi:ApiKeyId"]
                 ?? throw new ArgumentNullException(nameof(config), "Coinbase API key ID is not configured.");
             _apiSecret = config["CoinbaseApi:ApiSecret"]
