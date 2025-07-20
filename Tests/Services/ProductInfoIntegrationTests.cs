@@ -19,7 +19,7 @@ namespace crypto_bot_api.Tests.Services
 
         private const string MOCK_PRODUCT_RESPONSE = @"[
             {
-                ""product_id"": ""BTC-USD"",
+                ""id"": ""BTC-USD"",
                 ""base_currency"": ""BTC"",
                 ""quote_currency"": ""USD"",
                 ""quote_increment"": ""0.01"",
@@ -39,7 +39,7 @@ namespace crypto_bot_api.Tests.Services
                 ""high_bid_limit_percentage"": """"
             },
             {
-                ""product_id"": ""ETH-USD"",
+                ""id"": ""ETH-USD"",
                 ""base_currency"": ""ETH"",
                 ""quote_currency"": ""USD"",
                 ""quote_increment"": ""0.01"",

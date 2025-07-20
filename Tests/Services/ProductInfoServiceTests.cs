@@ -65,11 +65,11 @@ namespace crypto_bot_api.Tests.Services
             {
                 new
                 {
-                    product_id = "BTC-USD",
+                    id = "BTC-USD",
                     base_currency = "BTC",
                     quote_currency = "USD",
                     quote_increment = "0.01",
-                    base_increment = "0.00000001",
+                    base_increment = "0.00001",
                     display_name = "BTC/USD",
                     min_market_funds = "10",
                     margin_enabled = false,
@@ -96,7 +96,7 @@ namespace crypto_bot_api.Tests.Services
             Assert.AreEqual("BTC-USD", result.ProductId);
             Assert.AreEqual("BTC", result.BaseCurrency);
             Assert.AreEqual("USD", result.QuoteCurrency);
-            Assert.AreEqual(0.00000001m, result.BaseIncrement);
+            Assert.AreEqual(0.00001m, result.BaseIncrement);
             Assert.AreEqual(10m, result.MinMarketFunds);
         }
 
@@ -165,13 +165,13 @@ namespace crypto_bot_api.Tests.Services
             {
                 new
                 {
-                    product_id = "BTC-USD",
+                    id = "BTC-USD",
                     base_currency = "BTC",
                     quote_currency = "USD",
                     quote_increment = "0.01",
-                    base_increment = "0.00000002", // Updated value
+                    base_increment = "0.00000002",
                     display_name = "BTC/USD",
-                    min_market_funds = "15", // Updated value
+                    min_market_funds = "15",
                     margin_enabled = false,
                     post_only = false,
                     limit_only = false,
