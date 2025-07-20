@@ -123,25 +123,35 @@ namespace crypto_bot_api.Services
                 throw new InvalidOperationException("No products returned from Coinbase API");
             }
 
+            // Filter out invalid products first
+            var validProducts = products
+                .Where(p => !string.IsNullOrEmpty(p.Id))
+                .ToList();
+
+            var skippedCount = products.Count - validProducts.Count;
+            if (skippedCount > 0)
+            {
+                _logger.LogInformation("Skipped {Count} products with null or empty IDs", skippedCount);
+            }
+
+            if (!validProducts.Any())
+            {
+                throw new InvalidOperationException("No valid products found in Coinbase API response");
+            }
+
             var now = DateTime.UtcNow;
             try
             {
-                // Clear existing products
+                // Only clear existing products if we have valid ones to replace them with
                 _dbContext.ProductInfo.RemoveRange(_dbContext.ProductInfo);
 
                 // Add new products
-                foreach (var product in products)
+                foreach (var product in validProducts)
                 {
-                    if (string.IsNullOrEmpty(product.Id))
-                    {
-                        _logger.LogWarning("Skipping product with null or empty ID");
-                        continue;
-                    }
-
                     await _dbContext.ProductInfo.AddAsync(new ProductInfo
                     {
                         Id = Guid.NewGuid().ToString(),
-                        ProductId = product.Id,
+                        ProductId = product.Id!,  // Safe because we filtered
                         BaseCurrency = product.BaseCurrency ?? string.Empty,
                         QuoteCurrency = product.QuoteCurrency ?? string.Empty,
                         BaseIncrement = ParseDecimalOrDefault(product.BaseIncrement),
@@ -164,7 +174,7 @@ namespace crypto_bot_api.Services
                 }
 
                 await _dbContext.SaveChangesAsync();
-                _logger.LogInformation("Successfully refreshed product information at {Timestamp}", now);
+                _logger.LogInformation("Successfully refreshed {Count} products at {Timestamp}", validProducts.Count, now);
             }
             catch (Exception ex)
             {
@@ -181,7 +191,7 @@ namespace crypto_bot_api.Services
 
         private class CoinbaseProduct
         {
-            [JsonPropertyName("product_id")]
+            [JsonPropertyName("id")]
             public string? Id { get; set; }
             
             [JsonPropertyName("base_currency")]

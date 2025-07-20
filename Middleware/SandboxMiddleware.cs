@@ -69,7 +69,7 @@ namespace crypto_bot_api.Middleware
 
         public static IServiceCollection AddSandboxServices(this IServiceCollection services)
         {
-            services.AddScoped<ISandboxHeaderValidator, SandboxHeaderValidator>();
+            services.AddSingleton<ISandboxHeaderValidator, SandboxHeaderValidator>();
             return services;
         }
     }
