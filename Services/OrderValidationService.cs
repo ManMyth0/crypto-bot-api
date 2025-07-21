@@ -67,6 +67,7 @@ namespace crypto_bot_api.Services
             // Get order size from configuration
             string? baseSize = null;
             string? quoteSize = null;
+            bool isMarketOrder = false;
 
             if (orderRequest.OrderConfiguration?.LimitLimitGtc != null)
             {
@@ -86,6 +87,7 @@ namespace crypto_bot_api.Services
                 }
                 baseSize = orderRequest.OrderConfiguration.MarketMarketIoc.BaseSize;
                 quoteSize = orderRequest.OrderConfiguration.MarketMarketIoc.QuoteSize;
+                isMarketOrder = true;
             }
             else
             {
@@ -93,30 +95,45 @@ namespace crypto_bot_api.Services
                 return result;
             }
 
-            if (string.IsNullOrEmpty(baseSize))
+            // For market orders, only quote_size is required
+            if (isMarketOrder)
             {
-                result.Warnings.Add("BaseSize is required");
-                return result;
-            }
-
-            if (string.IsNullOrEmpty(quoteSize))
-            {
-                result.Warnings.Add("QuoteSize is required");
-                return result;
-            }
-
-            // Validate base_size increment
-            if (decimal.TryParse(baseSize, out decimal baseSizeValue))
-            {
-                var remainder = baseSizeValue % productInfo.BaseIncrement;
-                if (remainder != 0)
+                if (string.IsNullOrEmpty(quoteSize))
                 {
-                    result.Warnings.Add($"Base size {baseSizeValue} is not an increment of {productInfo.BaseIncrement}");
+                    result.Warnings.Add("QuoteSize is required for market orders");
+                    return result;
                 }
             }
+            // For limit orders, both base_size and quote_size are required
             else
             {
-                result.Warnings.Add("Invalid base_size format");
+                if (string.IsNullOrEmpty(baseSize))
+                {
+                    result.Warnings.Add("BaseSize is required for limit orders");
+                    return result;
+                }
+                if (string.IsNullOrEmpty(quoteSize))
+                {
+                    result.Warnings.Add("QuoteSize is required for limit orders");
+                    return result;
+                }
+            }
+
+            // Validate base_size increment if provided
+            if (!string.IsNullOrEmpty(baseSize))
+            {
+                if (decimal.TryParse(baseSize, out decimal baseSizeValue))
+                {
+                    var remainder = baseSizeValue % productInfo.BaseIncrement;
+                    if (remainder != 0)
+                    {
+                        result.Warnings.Add($"Base size {baseSizeValue} is not an increment of {productInfo.BaseIncrement}");
+                    }
+                }
+                else
+                {
+                    result.Warnings.Add("Invalid base_size format");
+                }
             }
 
             // Validate minimum order value

@@ -124,21 +124,21 @@ The API requires position tracking information for proper trade management:
     "position_id": "optional-uuid", // For closing trades. Omit for opening new positions
     "order_configuration": {
         "market_market_ioc": {
-            // Specify at least one of these (both can be included):
-            "base_size": "0.001",    // Amount in base currency (e.g., BTC)
-            "quote_size": "20000"    // Amount in quote currency (e.g., USD)
-            // Note: Behavior verified in sandbox, may differ in production
+            // For market orders, only quote_size is required
+            "quote_size": "20000"    // Required: Amount to spend in quote currency (e.g., USD)
         }
         // OR for limit orders (GTC - Good Till Canceled):
         "limit_limit_gtc": {
-            "base_size": "0.001",
-            "limit_price": "20000"
+            "base_size": "0.001",    // Required: Amount in base currency (e.g., BTC)
+            "quote_size": "20000",   // Required: Amount in quote currency (e.g., USD)
+            "limit_price": "20000"   // Required: Price per unit
         }
         // OR for limit orders (GTD - Good Till Date):
         "limit_limit_gtd": {
-            "base_size": "0.001",
-            "limit_price": "20000",
-            "end_time": "2024-12-31T23:59:59Z"  // UTC timestamp when the order expires is expected
+            "base_size": "0.001",    // Required: Amount in base currency (e.g., BTC)
+            "quote_size": "20000",   // Required: Amount in quote currency (e.g., USD)
+            "limit_price": "20000",  // Required: Price per unit
+            "end_time": "2024-12-31T23:59:59Z"  // Required: UTC timestamp when the order expires
         }
     }
 }

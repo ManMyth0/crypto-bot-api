@@ -271,5 +271,123 @@ namespace crypto_bot_api.Tests.Services
             // Assert
             Assert.IsTrue(result.Warnings.Any(w => w.ToLower().Contains("limit orders only")));
         }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_MarketOrder_OnlyQuoteSizeRequired()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    MarketMarketIoc = new MarketMarketIocConfig
+                    {
+                        QuoteSize = "50.00" // Only quote_size provided
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.IsValid);
+            Assert.AreEqual(0, result.Warnings.Count);
+        }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_LimitOrder_RequiresBothSizes()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtc = new LimitLimitGtcDto
+                    {
+                        BaseSize = "0.001" // Missing quote_size
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("QuoteSize is required")));
+        }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_MarketOrder_MissingQuoteSize_ReturnsWarning()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    MarketMarketIoc = new MarketMarketIocConfig
+                    {
+                        BaseSize = "0.001" // Only base_size provided, missing required quote_size
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("QuoteSize is required")));
+        }
     }
 } 
