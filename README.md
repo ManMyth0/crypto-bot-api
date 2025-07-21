@@ -107,17 +107,38 @@ Warnings are provided for:
 - Orders below minimum funds
 - Limit-only product restrictions
 
+### Position Tracking
+The API requires position tracking information for proper trade management:
+- `position_type`: Must be either "LONG" or "SHORT" (case-insensitive)
+- Used to track position direction and calculate P&L
+- Required for both opening and closing trades
+- Works in conjunction with `position_id` for closing trades
+
 ## Order Request Format
 ```json
 {
+    "client_order_id": "optional-unique-id", // Auto-generated through the GenerateCoinbaseClientOrderId Utility
     "product_id": "BTC-USD",
     "side": "BUY",  // or "SELL"
-    "client_order_id": "optional-unique-id", // Auto-generated through the GenerateCoinbaseClientOrderId Utility
+    "position_type": "LONG",  // or "SHORT" - Required for position tracking, is case insensitive
     "position_id": "optional-uuid", // For closing trades. Omit for opening new positions
     "order_configuration": {
+        "market_market_ioc": {
+            // Specify at least one of these (both can be included):
+            "base_size": "0.001",    // Amount in base currency (e.g., BTC)
+            "quote_size": "20000"    // Amount in quote currency (e.g., USD)
+            // Note: Behavior verified in sandbox, may differ in production
+        }
+        // OR for limit orders (GTC - Good Till Canceled):
         "limit_limit_gtc": {
             "base_size": "0.001",
             "limit_price": "20000"
+        }
+        // OR for limit orders (GTD - Good Till Date):
+        "limit_limit_gtd": {
+            "base_size": "0.001",
+            "limit_price": "20000",
+            "end_time": "2024-12-31T23:59:59Z"  // UTC timestamp when the order expires is expected
         }
     }
 }
@@ -177,8 +198,9 @@ Example asset-pair:
 ```
 
 ## Supported Order Types
-- `limit_limit_gtc` - Good Till Canceled limit orders (GTC)
 - `limit_limit_gtd` - Good Till Date limit orders (GTD)
+- `limit_limit_gtc` - Good Till Canceled limit orders (GTC)
+- `market_market_ioc` - Immediate-or-Cancel market orders (IOC)
 
 ## Technologies Used
 
