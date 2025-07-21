@@ -4,7 +4,7 @@ namespace crypto_bot_api.Services
     public static class SandboxEndpoints
     {
         // Base URL for sandbox
-        public const string SandboxBaseUrl = "https://api-sandbox.coinbase.com/api/v3/brokerage";
+        public const string SandboxBaseUrl = "https://api-sandbox.coinbase.com";
 
         public static class Methods
         {

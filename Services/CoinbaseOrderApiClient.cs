@@ -40,8 +40,16 @@ namespace crypto_bot_api.Services
             
             var jwt = _jwtHelper.GenerateJwt(uri);
             
-            // Serialize the order request to JSON
-            string requestContent = JsonSerializer.Serialize(orderRequest);
+            // Serialize the order request to JSON, stripping position tracking in sandbox mode
+            string requestContent = _isSandbox 
+                ? JsonSerializer.Serialize(new
+                {
+                    client_order_id = orderRequest.ClientOrderId,
+                    product_id = orderRequest.ProductId,
+                    side = orderRequest.Side,
+                    order_configuration = orderRequest.OrderConfiguration
+                })
+                : JsonSerializer.Serialize(orderRequest);
             
             string jsonResponse = await SendAuthenticatedPostRequestAsync(jwt, fullUrl, requestContent, "Failed to create order.");
             return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();
@@ -221,11 +229,14 @@ namespace crypto_bot_api.Services
 
         public async Task<JsonObject> GetOrderAsync(string orderId)
         {
-            var response = await _httpClient.GetAsync($"/api/v3/brokerage/orders/{orderId}");
-            response.EnsureSuccessStatusCode();
+            string endpoint = $"/api/v3/brokerage/orders/historical/{orderId}";
+            string uri = $"GET {endpoint}";
+            string fullUrl = $"{_baseUrl.TrimEnd('/')}{endpoint}";
             
-            var content = await response.Content.ReadAsStringAsync();
-            return JsonNode.Parse(content)?.AsObject() ?? new JsonObject();
+            var jwt = _jwtHelper.GenerateJwt(uri);
+            
+            string jsonResponse = await SendAuthenticatedGetRequestAsync(jwt, fullUrl, $"Failed to retrieve order {orderId}.");
+            return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();
         }
     }
 } 

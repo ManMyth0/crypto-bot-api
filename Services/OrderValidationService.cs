@@ -78,14 +78,14 @@ namespace crypto_bot_api.Services
                 baseSize = orderRequest.OrderConfiguration.LimitLimitGtd.BaseSize;
                 quoteSize = orderRequest.OrderConfiguration.LimitLimitGtd.QuoteSize;
             }
-            else if (orderRequest.OrderConfiguration?.MarketMarket != null)
+            else if (orderRequest.OrderConfiguration?.MarketMarketIoc != null)
             {
                 if (productInfo.LimitOnly)
                 {
                     result.Warnings.Add($"Product {orderRequest.ProductId} accepts limit orders only");
                 }
-                baseSize = orderRequest.OrderConfiguration.MarketMarket.BaseSize;
-                quoteSize = orderRequest.OrderConfiguration.MarketMarket.QuoteSize;
+                baseSize = orderRequest.OrderConfiguration.MarketMarketIoc.BaseSize;
+                quoteSize = orderRequest.OrderConfiguration.MarketMarketIoc.QuoteSize;
             }
             else
             {

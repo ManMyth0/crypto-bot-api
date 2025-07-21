@@ -35,8 +35,8 @@ namespace crypto_bot_api.Models.DTOs.Orders
 
     public class OrderConfigurationDto
     {
-        [JsonPropertyName("market_market")]
-        public MarketMarketConfig? MarketMarket { get; set; }
+        [JsonPropertyName("market_market_ioc")]
+        public MarketMarketIocConfig? MarketMarketIoc { get; set; }
 
         [JsonPropertyName("limit_limit_gtc")]
         public LimitLimitGtcDto? LimitLimitGtc { get; set; }
@@ -56,6 +56,9 @@ namespace crypto_bot_api.Models.DTOs.Orders
         [JsonPropertyName("limit_price")]
         [Required]
         public string? LimitPrice { get; set; }
+
+        [JsonPropertyName("rfq_disabled")]
+        public bool RfqDisabled { get; set; } = true;
     }
 
     public class LimitLimitGtdDto
@@ -73,5 +76,8 @@ namespace crypto_bot_api.Models.DTOs.Orders
         [JsonPropertyName("end_time")]
         [Required]
         public string? EndTime { get; set; }
+
+        [JsonPropertyName("post_only")]
+        public bool PostOnly { get; set; }
     }
 } 

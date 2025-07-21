@@ -50,10 +50,11 @@ namespace crypto_bot_api.Tests.Services
                 ClientOrderId = Guid.NewGuid().ToString(),
                 OrderConfiguration = new OrderConfigurationDto
                 {
-                    MarketMarket = new MarketMarketConfig
+                    MarketMarketIoc = new MarketMarketIocConfig
                     {
                         BaseSize = baseSize,
-                        QuoteSize = quoteSize
+                        QuoteSize = quoteSize,
+                        RfqDisabled = true
                     }
                 }
             };
