@@ -6,7 +6,7 @@ namespace crypto_bot_api.Services
 {
     public interface IPositionManagementService
     {
-        Task<TradeRecords> CreatePositionFromOrderAsync(FinalizedOrderDetails orderDetails);
+        Task<TradeRecords> CreatePositionFromOrderAsync(FinalizedOrderDetails orderDetails, string? originalPositionType = null);
         Task<TradeRecords> UpdatePositionFromClosingOrderAsync(FinalizedOrderDetails orderDetails, Guid positionId);
         Task<IEnumerable<TradeRecords>> GetOpenPositionsAsync(string? assetPair = null);
         Task<TradeRecords?> GetPositionByIdAsync(Guid positionId);
@@ -23,7 +23,7 @@ namespace crypto_bot_api.Services
             _calculator = calculator;
         }
 
-        public async Task<TradeRecords> CreatePositionFromOrderAsync(FinalizedOrderDetails orderDetails)
+        public async Task<TradeRecords> CreatePositionFromOrderAsync(FinalizedOrderDetails orderDetails, string? originalPositionType = null)
         {
             if (string.IsNullOrEmpty(orderDetails.Trade_Type))
                 throw new ArgumentException("Trade type is required", nameof(orderDetails));
@@ -40,7 +40,9 @@ namespace crypto_bot_api.Services
             var position = new TradeRecords
             {
                 position_uuid = Guid.NewGuid(),
-                position_type = orderDetails.Trade_Type == "BUY" ? "LONG" : "SHORT",
+                position_type = !string.IsNullOrEmpty(originalPositionType) 
+                    ? originalPositionType.ToUpperInvariant() 
+                    : (orderDetails.Trade_Type == "BUY" ? "LONG" : "SHORT"),
                 asset_pair = orderDetails.Asset_Pair,
                 acquired_price = orderDetails.Acquired_Price.Value,
                 acquired_quantity = orderDetails.Acquired_Quantity.Value,

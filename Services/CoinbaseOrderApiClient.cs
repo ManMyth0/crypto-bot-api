@@ -40,16 +40,14 @@ namespace crypto_bot_api.Services
             
             var jwt = _jwtHelper.GenerateJwt(uri);
             
-            // Serialize the order request to JSON, stripping position tracking in sandbox mode
-            string requestContent = _isSandbox 
-                ? JsonSerializer.Serialize(new
-                {
-                    client_order_id = orderRequest.ClientOrderId,
-                    product_id = orderRequest.ProductId,
-                    side = orderRequest.Side,
-                    order_configuration = orderRequest.OrderConfiguration
-                })
-                : JsonSerializer.Serialize(orderRequest);
+            // Serialize the order request to JSON, excluding position_type as it's for internal tracking only
+            string requestContent = JsonSerializer.Serialize(new
+            {
+                client_order_id = orderRequest.ClientOrderId,
+                product_id = orderRequest.ProductId,
+                side = orderRequest.Side,
+                order_configuration = orderRequest.OrderConfiguration
+            });
             
             string jsonResponse = await SendAuthenticatedPostRequestAsync(jwt, fullUrl, requestContent, "Failed to create order.");
             return JsonSerializer.Deserialize<JsonObject>(jsonResponse) ?? new JsonObject();

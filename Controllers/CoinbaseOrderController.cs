@@ -45,7 +45,9 @@ namespace crypto_bot_api.Controllers
                 return Ok(new OrderResponse
                 {
                     Order = result,
-                    ValidationResult = validation
+                    ValidationResult = validation,
+                    PositionType = orderRequest.PositionType,
+                    ClientOrderId = orderRequest.ClientOrderId
                 });
             }
             catch (Exception ex)

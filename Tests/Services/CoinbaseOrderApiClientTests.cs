@@ -63,7 +63,6 @@ namespace crypto_bot_api.Tests.Services
                 ""order_id"": ""b947374d-5178-43a0-81f9-2dc0b58cca15"",
                 ""product_id"": ""BTC-USD"",
                 ""side"": ""BUY"",
-                ""position_type"": ""LONG"",
                 ""client_order_id"": ""0123-45678-012345""
             }
         }";
@@ -74,7 +73,6 @@ namespace crypto_bot_api.Tests.Services
                 ""order_id"": ""01234567-89ab-cdef-ghij-klmnopqrstuv"",
                 ""product_id"": ""BTC-USD"",
                 ""side"": ""SELL"",
-                ""position_type"": ""SHORT"",
                 ""client_order_id"": ""0123-45678-012345""
             }
         }";
@@ -134,7 +132,6 @@ namespace crypto_bot_api.Tests.Services
             Assert.IsNotNull(result["success_response"]);
             Assert.AreEqual("BTC-USD", result["success_response"]?["product_id"]?.GetValue<string>());
             Assert.AreEqual("BUY", result["success_response"]?["side"]?.GetValue<string>());
-            Assert.AreEqual("LONG", result["success_response"]?["position_type"]?.GetValue<string>());
             Assert.AreEqual("0123-45678-012345", result["success_response"]?["client_order_id"]?.GetValue<string>());
         }
         
@@ -171,7 +168,6 @@ namespace crypto_bot_api.Tests.Services
             Assert.IsNotNull(result["success_response"]);
             Assert.AreEqual("BTC-USD", result["success_response"]?["product_id"]?.GetValue<string>());
             Assert.AreEqual("SELL", result["success_response"]?["side"]?.GetValue<string>());
-            Assert.AreEqual("SHORT", result["success_response"]?["position_type"]?.GetValue<string>());
             Assert.AreEqual("0123-45678-012345", result["success_response"]?["client_order_id"]?.GetValue<string>());
         }
 
