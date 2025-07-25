@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Security.Cryptography;
 using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Crypto.Parameters;
@@ -10,11 +11,20 @@ namespace crypto_bot_api.Helpers
     {
         private readonly string _apiKeyId;
         private readonly string _apiSecret;
+        private readonly JsonSerializerOptions _jsonOptions;
 
         public Ed25519JwtHelper(string apiKeyId, string apiSecret)
         {
             _apiKeyId = apiKeyId ?? throw new ArgumentNullException(nameof(apiKeyId));
             _apiSecret = apiSecret ?? throw new ArgumentNullException(nameof(apiSecret));
+            
+            // Configure JSON serialization to match Coinbase's expected format
+            _jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = false,
+                PropertyNamingPolicy = null,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
         }
 
         // Returns the JWT token as a string
@@ -32,19 +42,22 @@ namespace crypto_bot_api.Helpers
                 string method = uriParts[0];
                 string path = uriParts[1];
                 
-                string fullUri = $"{method} api.coinbase.com{path}";
+                // Remove query parameters from the path for JWT generation
+                string basePath = path.Split('?')[0];
                 
-                // Create JWT header
+                string fullUri = $"{method} api.coinbase.com{basePath}";
+                
+                // Create JWT header with correct field order
                 var header = new Dictionary<string, object>
                 {
-                    { "alg", "EdDSA" },
                     { "typ", "JWT" },
+                    { "alg", "EdDSA" },
                     { "kid", _apiKeyId },
                     { "nonce", GenerateNonce() }
                 };
                 
                 // Format header as JSON and encode
-                string headerJson = System.Text.Json.JsonSerializer.Serialize(header);
+                string headerJson = System.Text.Json.JsonSerializer.Serialize(header, _jsonOptions);
                 string encodedHeader = Base64UrlEncode(headerJson);
                 
                 // Get current time for JWT validity
@@ -52,18 +65,18 @@ namespace crypto_bot_api.Helpers
                 long nbf = now.ToUnixTimeSeconds();
                 long exp = now.AddMinutes(2).ToUnixTimeSeconds(); // 2 minutes expiration as per Coinbase docs
                 
-                // Create JWT payload 
+                // Create JWT payload with correct field order
                 var payload = new Dictionary<string, object>
                 {
-                    { "iss", "cdp" },
-                    { "sub", _apiKeyId },
-                    { "nbf", nbf },
-                    { "exp", exp },
-                    { "uri", fullUri }
+                    { "iss", "cdp" },     // 1st
+                    { "nbf", nbf },       // 2nd
+                    { "exp", exp },       // 3rd
+                    { "sub", _apiKeyId }, // 4th
+                    { "uri", fullUri }    // 5th
                 };
                 
                 // Format payload as JSON and encode
-                string payloadJson = System.Text.Json.JsonSerializer.Serialize(payload);
+                string payloadJson = System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions);
                 string encodedPayload = Base64UrlEncode(payloadJson);
                 
                 // Create signature data (header.payload)
@@ -74,7 +87,9 @@ namespace crypto_bot_api.Helpers
                 string encodedSignature = Base64UrlEncode(signature);
                 
                 // Assemble final JWT (header.payload.signature)
-                return $"{encodedHeader}.{encodedPayload}.{encodedSignature}";
+                string jwt = $"{encodedHeader}.{encodedPayload}.{encodedSignature}";
+                
+                return jwt;
             }
             catch (Exception ex)
             {
