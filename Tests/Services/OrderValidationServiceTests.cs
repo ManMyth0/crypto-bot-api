@@ -61,7 +61,7 @@ namespace crypto_bot_api.Tests.Services
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_ValidOrder_NoWarnings()
+        public async Task ValidateOrderAsync_LimitOrder_BothSizesProvided_ReturnsError_WithValidValues()
         {
             // Arrange
             var orderRequest = CreateLimitOrderRequest(
@@ -88,8 +88,9 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
-            Assert.IsTrue(result.IsValid);
-            Assert.AreEqual(0, result.Warnings.Count);
+            Assert.IsFalse(result.IsValid); // Should be invalid because both sizes are provided
+            Assert.AreEqual(1, result.Warnings.Count); // Should have error about providing both sizes
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("Only one of BaseSize or QuoteSize should be provided")));
             Assert.AreEqual("BTC-USD", result.ProductId);
             Assert.AreEqual("online", result.Status);
             Assert.IsFalse(result.TradingDisabled);
@@ -113,6 +114,7 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
+            Assert.IsFalse(result.IsValid);
             Assert.IsTrue(result.Warnings.Any(w => w.Contains("not found")));
         }
 
@@ -144,6 +146,7 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
+            Assert.IsFalse(result.IsValid);
             Assert.IsTrue(result.Warnings.Any(w => w.Contains("disabled")));
             Assert.IsTrue(result.TradingDisabled);
         }
@@ -152,12 +155,21 @@ namespace crypto_bot_api.Tests.Services
         public async Task ValidateOrderAsync_BelowMinimumFunds_ReturnsWarning()
         {
             // Arrange
-            var orderRequest = CreateLimitOrderRequest(
-                productId: "BTC-USD",
-                baseSize: "0.001",
-                quoteSize: "5.00",
-                limitPrice: "5000.00"
-            );
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtc = new LimitLimitGtcDto
+                    {
+                        QuoteSize = "5.00", // Only quote_size provided, below minimum
+                        LimitPrice = "5000.00"
+                    }
+                }
+            };
 
             _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
                 .ReturnsAsync(new ProductInfo
@@ -176,6 +188,7 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
+            Assert.IsFalse(result.IsValid);
             Assert.IsTrue(result.Warnings.Any(w => w.Contains("below minimum")));
         }
 
@@ -183,12 +196,21 @@ namespace crypto_bot_api.Tests.Services
         public async Task ValidateOrderAsync_InvalidBaseIncrement_ReturnsWarning()
         {
             // Arrange
-            var orderRequest = CreateLimitOrderRequest(
-                productId: "BTC-USD",
-                baseSize: "0.0001234",
-                quoteSize: "50.00",
-                limitPrice: "50000.00"
-            );
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtc = new LimitLimitGtcDto
+                    {
+                        BaseSize = "0.0001234", // Only base_size provided, invalid increment
+                        LimitPrice = "50000.00"
+                    }
+                }
+            };
 
             _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
                 .ReturnsAsync(new ProductInfo
@@ -207,6 +229,7 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
+            Assert.IsFalse(result.IsValid);
             Assert.IsTrue(result.Warnings.Any(w => w.Contains("increment")));
         }
 
@@ -238,6 +261,7 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
+            Assert.IsFalse(result.IsValid);
             Assert.IsTrue(result.Warnings.Any(w => w.ToLower().Contains("delisted")));
         }
 
@@ -269,6 +293,7 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
+            Assert.IsFalse(result.IsValid);
             Assert.IsTrue(result.Warnings.Any(w => w.ToLower().Contains("limit orders only")));
         }
 
@@ -313,7 +338,7 @@ namespace crypto_bot_api.Tests.Services
         }
 
         [TestMethod]
-        public async Task ValidateOrderAsync_LimitOrder_RequiresBothSizes()
+        public async Task ValidateOrderAsync_LimitOrder_OnlyBaseSizeProvided_Valid()
         {
             // Arrange
             var orderRequest = new CreateOrderRequestDto
@@ -326,7 +351,8 @@ namespace crypto_bot_api.Tests.Services
                 {
                     LimitLimitGtc = new LimitLimitGtcDto
                     {
-                        BaseSize = "0.001" // Missing quote_size
+                        BaseSize = "0.001",
+                        LimitPrice = "50000.00"
                     }
                 }
             };
@@ -348,7 +374,218 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
-            Assert.IsTrue(result.Warnings.Any(w => w.Contains("QuoteSize is required")));
+            Assert.IsTrue(result.IsValid);
+            Assert.AreEqual(0, result.Warnings.Count);
+        }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_LimitOrder_OnlyQuoteSizeProvided_Valid()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtc = new LimitLimitGtcDto
+                    {
+                        QuoteSize = "50.00",
+                        LimitPrice = "50000.00"
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.IsValid);
+            Assert.AreEqual(0, result.Warnings.Count);
+        }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_LimitOrder_BothSizesProvided_ReturnsError()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtc = new LimitLimitGtcDto
+                    {
+                        BaseSize = "0.001",
+                        QuoteSize = "50.00",
+                        LimitPrice = "50000.00"
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsFalse(result.IsValid);
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("Only one of BaseSize or QuoteSize should be provided")));
+        }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_LimitOrder_BothSizesProvided_ReturnsEarlyError()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtc = new LimitLimitGtcDto
+                    {
+                        BaseSize = "0.0001234", // Invalid increment
+                        QuoteSize = "5.00",     // Below minimum funds
+                        LimitPrice = "50000.00"
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsFalse(result.IsValid); // Should be invalid because both sizes are provided
+            Assert.AreEqual(1, result.Warnings.Count); // Should only have error about providing both sizes
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("Only one of BaseSize or QuoteSize should be provided")));
+            // Should NOT validate individual fields since we return early
+        }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_LimitOrder_NoSizeProvided_ReturnsWarning()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtc = new LimitLimitGtcDto
+                    {
+                        LimitPrice = "50000.00"
+                        // Missing both base_size and quote_size
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsFalse(result.IsValid);
+            Assert.IsTrue(result.Warnings.Any(w => w.Contains("Either BaseSize or QuoteSize is required")));
+        }
+
+        [TestMethod]
+        public async Task ValidateOrderAsync_LimitOrderGtd_OnlyBaseSizeProvided_Valid()
+        {
+            // Arrange
+            var orderRequest = new CreateOrderRequestDto
+            {
+                ProductId = "BTC-USD",
+                Side = "BUY",
+                PositionType = "LONG",
+                ClientOrderId = Guid.NewGuid().ToString(),
+                OrderConfiguration = new OrderConfigurationDto
+                {
+                    LimitLimitGtd = new LimitLimitGtdDto
+                    {
+                        BaseSize = "0.001",
+                        LimitPrice = "50000.00",
+                        EndTime = "2024-12-31T23:59:59Z"
+                    }
+                }
+            };
+
+            _mockProductInfoService.Setup(x => x.GetProductInfoAsync("BTC-USD"))
+                .ReturnsAsync(new ProductInfo
+                {
+                    ProductId = "BTC-USD",
+                    BaseIncrement = 0.00001m,
+                    MinMarketFunds = 10m,
+                    Status = "online",
+                    StatusMessage = "",
+                    DisplayName = "BTC/USD",
+                    HighBidLimitPercentage = "",
+                    TradingDisabled = false
+                });
+
+            // Act
+            var result = await _service.ValidateOrderAsync(orderRequest);
+
+            // Assert
+            Assert.IsTrue(result.IsValid);
+            Assert.AreEqual(0, result.Warnings.Count);
         }
 
         [TestMethod]
@@ -387,6 +624,7 @@ namespace crypto_bot_api.Tests.Services
             var result = await _service.ValidateOrderAsync(orderRequest);
 
             // Assert
+            Assert.IsFalse(result.IsValid);
             Assert.IsTrue(result.Warnings.Any(w => w.Contains("QuoteSize is required")));
         }
     }

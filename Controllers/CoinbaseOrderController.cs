@@ -42,10 +42,21 @@ namespace crypto_bot_api.Controllers
                     orderRequest.ClientOrderId = ClientOrderIdGenerator.GenerateCoinbaseClientOrderId();
                 }
 
-                // Validate but don't block
+                // Validate the order
                 var validation = await _orderValidation.ValidateOrderAsync(orderRequest);
 
-                // Create order regardless of validation
+                // If validation fails, return error response
+                if (!validation.IsValid)
+                {
+                    return BadRequest(new 
+                    { 
+                        Error = "Order validation failed",
+                        ValidationErrors = validation.Warnings,
+                        ValidationResult = validation
+                    });
+                }
+
+                // Create order only if validation passes
                 var result = await _coinbaseOrderClient.CreateOrderAsync(orderRequest);
 
                 // Return order result with any validation warnings

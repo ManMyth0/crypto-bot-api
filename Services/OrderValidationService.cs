@@ -46,6 +46,7 @@ namespace crypto_bot_api.Services
             if (productInfo == null)
             {
                 result.Warnings.Add($"Product {orderRequest.ProductId} not found or unavailable");
+                result.IsValid = false;
                 return result;
             }
 
@@ -57,11 +58,13 @@ namespace crypto_bot_api.Services
             if (productInfo.TradingDisabled || productInfo.Status?.ToLower() == "offline")
             {
                 result.Warnings.Add($"Trading may be disabled for {orderRequest.ProductId} (Status: {productInfo.Status}, TradingDisabled: {productInfo.TradingDisabled})");
+                result.IsValid = false;
             }
 
             if (productInfo.Status?.ToLower() == "delisted")
             {
                 result.Warnings.Add($"Product {orderRequest.ProductId} appears to be delisted");
+                result.IsValid = false;
             }
 
             // Get order size from configuration
@@ -84,6 +87,7 @@ namespace crypto_bot_api.Services
                 if (productInfo.LimitOnly)
                 {
                     result.Warnings.Add($"Product {orderRequest.ProductId} accepts limit orders only");
+                    result.IsValid = false;
                 }
                 baseSize = orderRequest.OrderConfiguration.MarketMarketIoc.BaseSize;
                 quoteSize = orderRequest.OrderConfiguration.MarketMarketIoc.QuoteSize;
@@ -92,6 +96,7 @@ namespace crypto_bot_api.Services
             else
             {
                 result.Warnings.Add("Invalid order configuration");
+                result.IsValid = false;
                 return result;
             }
 
@@ -101,52 +106,63 @@ namespace crypto_bot_api.Services
                 if (string.IsNullOrEmpty(quoteSize))
                 {
                     result.Warnings.Add("QuoteSize is required for market orders");
+                    result.IsValid = false;
                     return result;
                 }
             }
-            // For limit orders, both base_size and quote_size are required
+            // For limit orders, either base_size OR quote_size is required (not both)
             else
             {
-                if (string.IsNullOrEmpty(baseSize))
+                if (string.IsNullOrEmpty(baseSize) && string.IsNullOrEmpty(quoteSize))
                 {
-                    result.Warnings.Add("BaseSize is required for limit orders");
+                    result.Warnings.Add("Either BaseSize or QuoteSize is required for limit orders");
+                    result.IsValid = false;
                     return result;
                 }
-                if (string.IsNullOrEmpty(quoteSize))
+                if (!string.IsNullOrEmpty(baseSize) && !string.IsNullOrEmpty(quoteSize))
                 {
-                    result.Warnings.Add("QuoteSize is required for limit orders");
+                    result.Warnings.Add("Only one of BaseSize or QuoteSize should be provided for limit orders, not both");
+                    result.IsValid = false;
                     return result;
                 }
             }
 
-            // Validate base_size increment if provided
+            // Validate the fields that are actually provided
             if (!string.IsNullOrEmpty(baseSize))
             {
                 if (decimal.TryParse(baseSize, out decimal baseSizeValue))
                 {
+                    // Check base_size increment
                     var remainder = baseSizeValue % productInfo.BaseIncrement;
                     if (remainder != 0)
                     {
                         result.Warnings.Add($"Base size {baseSizeValue} is not an increment of {productInfo.BaseIncrement}");
+                        result.IsValid = false;
                     }
                 }
                 else
                 {
                     result.Warnings.Add("Invalid base_size format");
+                    result.IsValid = false;
                 }
             }
 
-            // Validate minimum order value
-            if (decimal.TryParse(quoteSize, out decimal quoteSizeValue))
+            if (!string.IsNullOrEmpty(quoteSize))
             {
-                if (quoteSizeValue < productInfo.MinMarketFunds)
+                if (decimal.TryParse(quoteSize, out decimal quoteSizeValue))
                 {
-                    result.Warnings.Add($"Order value {quoteSizeValue} is below minimum {productInfo.MinMarketFunds}");
+                    // Check minimum funds requirement
+                    if (quoteSizeValue < productInfo.MinMarketFunds)
+                    {
+                        result.Warnings.Add($"Order value {quoteSizeValue} is below minimum {productInfo.MinMarketFunds}");
+                        result.IsValid = false;
+                    }
                 }
-            }
-            else
-            {
-                result.Warnings.Add("Invalid quote_size format");
+                else
+                {
+                    result.Warnings.Add("Invalid quote_size format");
+                    result.IsValid = false;
+                }
             }
 
             _logger.LogInformation("Order validation completed for {ProductId} with {WarningCount} warnings", 
