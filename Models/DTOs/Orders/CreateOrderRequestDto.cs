@@ -6,7 +6,6 @@ namespace crypto_bot_api.Models.DTOs.Orders
     public class CreateOrderRequestDto
     {
         [JsonPropertyName("client_order_id")]
-        [Required]
         public string? ClientOrderId { get; set; }
 
         [JsonPropertyName("product_id")]

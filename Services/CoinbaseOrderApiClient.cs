@@ -2,7 +2,6 @@ using System.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using crypto_bot_api.Helpers;
-using crypto_bot_api.Utilities;
 using Microsoft.Extensions.Options;
 using crypto_bot_api.Models.DTOs.Orders;
 
@@ -28,12 +27,6 @@ namespace crypto_bot_api.Services
 
         public async Task<JsonObject> CreateOrderAsync(CreateOrderRequestDto orderRequest)
         {
-            // Generate a client order ID if one is not provided
-            if (string.IsNullOrEmpty(orderRequest.ClientOrderId))
-            {
-                orderRequest.ClientOrderId = ClientOrderIdGenerator.GenerateCoinbaseClientOrderId();
-            }
-            
             string endpoint = "/api/v3/brokerage/orders";
             string uri = $"POST {endpoint}";
             string fullUrl = $"{_baseUrl.TrimEnd('/')}{endpoint}";

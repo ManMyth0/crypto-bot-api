@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using crypto_bot_api.Services;
 using Microsoft.AspNetCore.Mvc;
+using crypto_bot_api.Utilities;
 using crypto_bot_api.CustomExceptions;
 using crypto_bot_api.Models.DTOs.Orders;
 
@@ -35,6 +36,12 @@ namespace crypto_bot_api.Controllers
         {
             try
             {
+                // Generate client order ID if not provided
+                if (string.IsNullOrEmpty(orderRequest.ClientOrderId))
+                {
+                    orderRequest.ClientOrderId = ClientOrderIdGenerator.GenerateCoinbaseClientOrderId();
+                }
+
                 // Validate but don't block
                 var validation = await _orderValidation.ValidateOrderAsync(orderRequest);
 
