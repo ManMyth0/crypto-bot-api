@@ -49,9 +49,9 @@ namespace crypto_bot_api.Tests.Services
                 total_commissions = 10.00m,
                 profit_loss = 0m,
                 percentage_return = 0m,
-                leftover_quantity = 1.5m,
+                leftover_quantity = 1.0m,
                 is_position_closed = false,
-                last_updated = DateTime.UtcNow
+                record_opened_at = DateTime.UtcNow
             };
 
             var openingTrade = new OpeningTrades
@@ -127,7 +127,6 @@ namespace crypto_bot_api.Tests.Services
                 retrievedRecord.profit_loss = (55000.00m * 1.0m) - (50000.00m * 1.0m) - 20.00m; // Sold 1.0 BTC
                 retrievedRecord.percentage_return = ((55000.00m - 50000.00m) / 50000.00m) * 100;
                 retrievedRecord.total_commissions = 20.00m; // Added sell commission
-                retrievedRecord.last_updated = DateTime.UtcNow;
                 
                 await _context.SaveChangesAsync();
 

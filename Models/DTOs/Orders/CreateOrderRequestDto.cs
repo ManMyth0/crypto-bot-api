@@ -19,7 +19,7 @@ namespace crypto_bot_api.Models.DTOs.Orders
 
         [JsonPropertyName("position_type")]
         [Required]
-        [RegularExpression("(?i)^(LONG|SHORT)$")]
+        [RegularExpression("(?i)^(LONG|SHORT|OFFLOAD)$")]
         public string? PositionType { get; set; }
 
         [JsonPropertyName("order_configuration")]

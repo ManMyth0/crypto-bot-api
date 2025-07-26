@@ -48,10 +48,13 @@ namespace crypto_bot_api.Tests.Services
         [TestMethod]
         [DataRow("LONG")]
         [DataRow("SHORT")]
+        [DataRow("OFFLOAD")]
         [DataRow("long")]
         [DataRow("short")]
+        [DataRow("offload")]
         [DataRow("Long")]
         [DataRow("Short")]
+        [DataRow("Offload")]
         public void PositionType_ValidValues_PassValidation(string positionType)
         {
             // Arrange
@@ -67,13 +70,17 @@ namespace crypto_bot_api.Tests.Services
         [DataRow(null)]
         [DataRow("LONGG")]
         [DataRow("SHORTT")]
+        [DataRow("OFFLOADD")]
         [DataRow("MEDIUM")]
         [DataRow("LON")]
         [DataRow("SHO")]
+        [DataRow("OFF")]
         [DataRow("LONG ")]
         [DataRow(" LONG")]
         [DataRow("SHORT ")]
         [DataRow(" SHORT")]
+        [DataRow("OFFLOAD ")]
+        [DataRow(" OFFLOAD")]
         public void PositionType_InvalidValues_FailValidation(string positionType)
         {
             // Arrange
@@ -98,7 +105,10 @@ namespace crypto_bot_api.Tests.Services
                 { "Long", "LONG" },
                 { "short", "SHORT" },
                 { "SHORT", "SHORT" },
-                { "Short", "SHORT" }
+                { "Short", "SHORT" },
+                { "offload", "OFFLOAD" },
+                { "OFFLOAD", "OFFLOAD" },
+                { "Offload", "OFFLOAD" }
             };
 
             foreach (var testCase in testCases)

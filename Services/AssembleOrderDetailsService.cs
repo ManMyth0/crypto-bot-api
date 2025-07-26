@@ -62,7 +62,8 @@ namespace crypto_bot_api.Services
             var tradeTimeStr = firstFill["trade_time"]?.GetValue<string>();
             if (tradeTimeStr != null && DateTime.TryParse(tradeTimeStr, out var tradeTime))
             {
-                details.Acquired_Time = tradeTime;
+                // Ensure the DateTime is treated as UTC to avoid PostgreSQL timezone issues
+                details.Acquired_Time = DateTime.SpecifyKind(tradeTime, DateTimeKind.Utc);
             }
 
             return details;

@@ -111,6 +111,8 @@ The API performs comprehensive validation before submitting orders to Coinbase:
 - Ensures order meets minimum funds requirement
 - Checks quote size formatting and validity
 
+- **For limit orders**: Requires either `base_size` OR `quote_size`, but not both
+
 ### Validation Response
 Instead of failing with errors, the API returns a ValidationResult containing:
 ```json
@@ -133,7 +135,10 @@ Warnings are provided for:
 
 ### Position Tracking
 The API requires position tracking information for proper trade management:
-- `position_type`: Must be either "LONG" or "SHORT" (case-insensitive)
+- `position_type`: Must be either "LONG", "SHORT", or "OFFLOAD" (case-insensitive)
+  - **"LONG"**: Used with BUY orders to open new long positions
+  - **"SHORT"**: Used with SELL orders to open new short positions  
+  - **"OFFLOAD"**: Used with SELL orders to close existing long positions
 - Used to track position direction and calculate P&L
 - Required for both opening and closing trades
 - Works in conjunction with `position_id` for closing trades
@@ -144,7 +149,7 @@ The API requires position tracking information for proper trade management:
     "client_order_id": "optional-unique-id", // Auto-generated through the GenerateCoinbaseClientOrderId Utility
     "product_id": "BTC-USD",
     "side": "BUY",  // or "SELL"
-    "position_type": "LONG",  // or "SHORT" - Required for position tracking, is case insensitive
+    "position_type": "LONG",  // "LONG", "SHORT", or "OFFLOAD" - Required for position tracking, is case insensitive
     "position_id": "optional-uuid", // For closing trades. Omit for opening new positions
     "order_configuration": {
         "market_market_ioc": {
@@ -153,15 +158,12 @@ The API requires position tracking information for proper trade management:
         }
         // OR for limit orders (GTC - Good Till Canceled):
         "limit_limit_gtc": {
-            "base_size": "0.001",    // Required: Amount in base currency (e.g., BTC)
-            "quote_size": "20000",   // Required: Amount in quote currency (e.g., USD)
+            "base_size": "0.001",    // Required: Amount in base currency (e.g., BTC) - OR "quote_size", not both
             "limit_price": "20000"   // Required: Price per unit
         }
         // OR for limit orders (GTD - Good Till Date):
         "limit_limit_gtd": {
-            "base_size": "0.001",    // Required: Amount in base currency (e.g., BTC)
-            "quote_size": "20000",   // Required: Amount in quote currency (e.g., USD)
-            "limit_price": "20000",  // Required: Price per unit
+            "quote_size": "20000",   // Required: Amount in quote currency (e.g., USD) - OR "base_size", not both
             "end_time": "2024-12-31T23:59:59Z"  // Required: UTC timestamp when the order expires
         }
     }

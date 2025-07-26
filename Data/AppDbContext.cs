@@ -35,7 +35,9 @@ namespace crypto_bot_api.Data
                 entity.Property(e => e.percentage_return).HasPrecision(18, 8);
                 entity.Property(e => e.leftover_quantity).HasPrecision(18, 8);
                 entity.Property(e => e.is_position_closed);
-                entity.Property(e => e.last_updated);
+                entity.Property(e => e.record_opened_at)
+                    .ValueGeneratedOnAdd()
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 // Create the index
                 entity.HasIndex(e => new { e.asset_pair, e.is_position_closed, e.leftover_quantity })
@@ -108,7 +110,7 @@ namespace crypto_bot_api.Data
         public decimal percentage_return { get; set; }
         public decimal leftover_quantity { get; set; }
         public bool is_position_closed { get; set; }
-        public DateTime last_updated { get; set; }
+        public DateTime record_opened_at { get; set; }
     }
 
     [Table("Opening_Trades", Schema = "public")]
