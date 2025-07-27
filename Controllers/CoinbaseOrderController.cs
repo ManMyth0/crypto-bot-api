@@ -251,7 +251,7 @@ namespace crypto_bot_api.Controllers
                 // Return order result immediately
                 var orderResponse = new OrderResponse
                 {
-                    Order = result,
+                    Order = result ?? new(),
                     ValidationResult = validation,
                     PositionType = orderRequest.PositionType ?? string.Empty,
                     ClientOrderId = orderRequest.ClientOrderId ?? string.Empty

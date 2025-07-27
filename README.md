@@ -9,6 +9,8 @@ Currently an API service that integrates with the Coinbase Advanced Trade API to
   - Calculate P&L and commission tracking
   - Support for partial position closure
   - Filtered indexes for efficient position queries
+  - Optional position tracking for simple trading scenarios
+  - Support for "BUY" position type for non-strategic purchases
 - Product Information Management
   - Efficient caching with 24-hour refresh
   - Automatic startup initialization
@@ -134,22 +136,42 @@ Warnings are provided for:
 - Limit-only product restrictions
 
 ### Position Tracking
-The API requires position tracking information for proper trade management:
-- `position_type`: Must be either "LONG", "SHORT", or "OFFLOAD" (case-insensitive)
+The API supports optional position tracking for trade management:
+- `position_type`: Optional field that can be "LONG", "SHORT", "OFFLOAD", or "BUY" (case-insensitive)
   - **"LONG"**: Used with BUY orders to open new long positions
   - **"SHORT"**: Used with SELL orders to open new short positions  
-  - **"OFFLOAD"**: Used with SELL orders to close existing long positions
-- Used to track position direction and calculate P&L
-- Required for both opening and closing trades
-- Works in conjunction with `position_id` for closing trades
+  - **"OFFLOAD"**: Used with SELL orders to close existing long positions, or with BUY orders to close existing short positions
+  - **"BUY"**: Used with BUY orders for simple purchases not tied to trading strategy
+  - **Omitted / null**: Skips position management entirely for simple trading
+- When provided, used to track position direction and calculate P&L
+- When omitted, the position/asset management system is bypassed
+- Works in conjunction with `position_id` for closing trades when position tracking is enabled
 
 ## Order Request Format
+
+### Simple Trading (No Position Management)
+To perform simple trades without position tracking, omit the `position_type` field:
+```json
+{
+    "client_order_id": "optional-unique-id",
+    "product_id": "BTC-USD",
+    "side": "BUY",
+    "order_configuration": {
+        "market_market_ioc": {
+            "quote_size": "20000"
+        }
+    }
+}
+```
+
+### Position-Managed Trading
+For trades with position tracking and management:
 ```json
 {
     "client_order_id": "optional-unique-id", // Auto-generated through the GenerateCoinbaseClientOrderId Utility
     "product_id": "BTC-USD",
     "side": "BUY",  // or "SELL"
-    "position_type": "LONG",  // "LONG", "SHORT", or "OFFLOAD" - Required for position tracking, is case insensitive
+    "position_type": "LONG",  // "LONG", "SHORT", "OFFLOAD", or "BUY" - Optional for position tracking, is case insensitive
     "position_id": "optional-uuid", // For closing trades. Omit for opening new positions
     "order_configuration": {
         "market_market_ioc": {
