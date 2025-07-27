@@ -60,7 +60,7 @@ namespace crypto_bot_api.Tests.Services
 
             // Assert
             Assert.IsNotNull(result);
-            Assert.AreEqual("LONG", result.position_type);
+            Assert.AreEqual("BUY", result.position_type);
             Assert.AreEqual("BTC-USD", result.asset_pair);
             Assert.AreEqual(50000.00m, result.acquired_price);
             Assert.AreEqual(1.5m, result.acquired_quantity);
@@ -115,7 +115,7 @@ namespace crypto_bot_api.Tests.Services
             var openingTrade = await _dbContext.OpeningTrades.FirstOrDefaultAsync(t => t.trade_id == "trade-124");
             Assert.IsNotNull(openingTrade);
             Assert.AreEqual(result.position_uuid, openingTrade.position_uuid);
-            Assert.AreEqual("SELL", openingTrade.side);
+            Assert.AreEqual("SHORT", openingTrade.side);
             Assert.AreEqual("BTC-USD", openingTrade.asset_pair);
             Assert.AreEqual(1.5m, openingTrade.acquired_quantity);
             Assert.AreEqual(50000.00m, openingTrade.acquired_price);
@@ -324,7 +324,7 @@ namespace crypto_bot_api.Tests.Services
                 Acquired_Time = DateTime.UtcNow
             };
 
-            var result = await _positionManager.UpdatePositionFromClosingOrderAsync(sellOrder);
+            var result = await _positionManager.UpdatePositionFromClosingOrderAsync(sellOrder, "LONG");
 
             // Assert
             Assert.IsNotNull(result);
@@ -529,7 +529,7 @@ namespace crypto_bot_api.Tests.Services
             };
 
             // Act
-            var result = await _positionManager.UpdatePositionFromClosingOrderAsync(orderDetails);
+            var result = await _positionManager.UpdatePositionFromClosingOrderAsync(orderDetails, "LONG");
 
             // Assert
             Assert.IsNotNull(result);

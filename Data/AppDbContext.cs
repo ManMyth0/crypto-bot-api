@@ -51,7 +51,7 @@ namespace crypto_bot_api.Data
                 entity.HasKey(e => e.trade_id);
                 
                 entity.Property(e => e.trade_id).HasMaxLength(255);
-                entity.Property(e => e.side).HasMaxLength(4);
+                entity.Property(e => e.side).HasMaxLength(10);
                 entity.Property(e => e.asset_pair).HasMaxLength(20);
                 entity.Property(e => e.acquired_quantity).HasPrecision(18, 8);
                 entity.Property(e => e.acquired_price).HasPrecision(18, 8);
@@ -70,7 +70,7 @@ namespace crypto_bot_api.Data
                 entity.HasKey(e => e.trade_id);
                 
                 entity.Property(e => e.trade_id).HasMaxLength(255);
-                entity.Property(e => e.side).HasMaxLength(4);
+                entity.Property(e => e.side).HasMaxLength(10);
                 entity.Property(e => e.asset_pair).HasMaxLength(20);
                 entity.Property(e => e.offloaded_quantity).HasPrecision(18, 8);
                 entity.Property(e => e.offloaded_price).HasPrecision(18, 8);

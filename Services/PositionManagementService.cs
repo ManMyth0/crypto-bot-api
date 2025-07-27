@@ -8,7 +8,7 @@ namespace crypto_bot_api.Services
     {
         Task<TradeRecords> CreatePositionFromOrderAsync(FinalizedOrderDetails orderDetails, string? originalPositionType = null);
         Task<TradeRecords> UpdatePositionFromClosingOrderAsync(FinalizedOrderDetails orderDetails, Guid positionId);
-        Task<TradeRecords> UpdatePositionFromClosingOrderAsync(FinalizedOrderDetails orderDetails);
+        Task<TradeRecords> UpdatePositionFromClosingOrderAsync(FinalizedOrderDetails orderDetails, string positionTypeToClose);
         Task<IEnumerable<TradeRecords>> GetOpenPositionsAsync(string? assetPair = null);
         Task<TradeRecords?> GetPositionByIdAsync(Guid positionId);
     }
@@ -43,7 +43,7 @@ namespace crypto_bot_api.Services
                 position_uuid = Guid.NewGuid(),
                 position_type = !string.IsNullOrEmpty(originalPositionType) 
                     ? originalPositionType.ToUpperInvariant() 
-                    : (orderDetails.Trade_Type == "BUY" ? "LONG" : "SHORT"),
+                    : orderDetails.Trade_Type,
                 asset_pair = orderDetails.Asset_Pair,
                 acquired_price = orderDetails.Acquired_Price.Value,
                 acquired_quantity = orderDetails.Acquired_Quantity.Value,
@@ -58,7 +58,9 @@ namespace crypto_bot_api.Services
             var openingTrade = new OpeningTrades
             {
                 trade_id = orderDetails.Trade_Id ?? throw new ArgumentException("Trade ID is required", nameof(orderDetails)),
-                side = orderDetails.Trade_Type,
+                side = !string.IsNullOrEmpty(originalPositionType) 
+                    ? originalPositionType.ToUpperInvariant() 
+                    : orderDetails.Trade_Type,
                 position_uuid = position.position_uuid,
                 asset_pair = orderDetails.Asset_Pair,
                 acquired_quantity = orderDetails.Acquired_Quantity.Value,
@@ -176,7 +178,7 @@ namespace crypto_bot_api.Services
                 .FirstOrDefaultAsync(p => p.position_uuid == positionId);
         }
 
-        public async Task<TradeRecords> UpdatePositionFromClosingOrderAsync(FinalizedOrderDetails orderDetails)
+        public async Task<TradeRecords> UpdatePositionFromClosingOrderAsync(FinalizedOrderDetails orderDetails, string positionTypeToClose)
         {
             if (string.IsNullOrEmpty(orderDetails.Trade_Type))
                 throw new ArgumentException("Trade type is required", nameof(orderDetails));
@@ -189,9 +191,8 @@ namespace crypto_bot_api.Services
             if (!orderDetails.Commissions.HasValue)
                 throw new ArgumentException("Commissions are required", nameof(orderDetails));
 
-            // For SELL orders, we need to find LONG positions to close
-            // For BUY orders, we need to find SHORT positions to close
-            string expectedPositionType = orderDetails.Trade_Type == "SELL" ? "LONG" : "SHORT";
+            // Use the specified position type to close
+            string expectedPositionType = positionTypeToClose;
             
             decimal remainingQuantityToClose = orderDetails.Acquired_Quantity.Value;
             TradeRecords? lastUpdatedPosition = null;

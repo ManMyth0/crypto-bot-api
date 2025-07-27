@@ -49,12 +49,15 @@ namespace crypto_bot_api.Tests.Services
         [DataRow("LONG")]
         [DataRow("SHORT")]
         [DataRow("OFFLOAD")]
+        [DataRow("BUY")]
         [DataRow("long")]
         [DataRow("short")]
         [DataRow("offload")]
+        [DataRow("buy")]
         [DataRow("Long")]
         [DataRow("Short")]
         [DataRow("Offload")]
+        [DataRow("Buy")]
         public void PositionType_ValidValues_PassValidation(string positionType)
         {
             // Arrange
@@ -66,8 +69,6 @@ namespace crypto_bot_api.Tests.Services
         }
 
         [TestMethod]
-        [DataRow("")]
-        [DataRow(null)]
         [DataRow("LONGG")]
         [DataRow("SHORTT")]
         [DataRow("OFFLOADD")]
@@ -92,6 +93,19 @@ namespace crypto_bot_api.Tests.Services
         }
 
         [TestMethod]
+        [DataRow("")]
+        [DataRow(null)]
+        public void PositionType_EmptyOrNullValues_PassValidation(string positionType)
+        {
+            // Arrange
+            var request = CreateValidOrderRequest();
+            request.PositionType = positionType;
+
+            // Act & Assert
+            ValidateModel(request, expectedErrorCount: 0);
+        }
+
+        [TestMethod]
         public void GetNormalizedPositionType_ReturnsUpperCase()
         {
             // Arrange
@@ -108,7 +122,10 @@ namespace crypto_bot_api.Tests.Services
                 { "Short", "SHORT" },
                 { "offload", "OFFLOAD" },
                 { "OFFLOAD", "OFFLOAD" },
-                { "Offload", "OFFLOAD" }
+                { "Offload", "OFFLOAD" },
+                { "buy", "BUY" },
+                { "BUY", "BUY" },
+                { "Buy", "BUY" }
             };
 
             foreach (var testCase in testCases)

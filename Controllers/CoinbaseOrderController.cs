@@ -82,7 +82,7 @@ namespace crypto_bot_api.Controllers
                 _logger.LogInformation("Full Coinbase response: {Response}", result?.ToJsonString() ?? "NULL");
 
                 // Extract order ID from the response
-                var orderId = result["order_id"]?.ToString();
+                var orderId = result?["order_id"]?.ToString();
                 _logger.LogInformation("Extracted order ID from response: {OrderId}", orderId ?? "NULL");
                 
                 // Also try alternative paths in case the structure is different
@@ -131,17 +131,45 @@ namespace crypto_bot_api.Controllers
                                 _logger.LogInformation("Order {OrderId} completed with status: {Status}", orderId, finalizedDetails.Status);
                                 
                                 // Handle position management based on order status and type
-                                if (finalizedDetails.Status == "FILLED" && !string.IsNullOrEmpty(finalizedDetails.Trade_Type))
+                                if (finalizedDetails.Status == "FILLED" && !string.IsNullOrEmpty(finalizedDetails.Trade_Type) && !string.IsNullOrEmpty(orderRequest.PositionType))
                                 {
                                     _logger.LogInformation("Order {OrderId} is FILLED with Trade_Type: {TradeType}", orderId, finalizedDetails.Trade_Type);
                                     try
                                     {
                                         if (finalizedDetails.Trade_Type == "BUY")
                                         {
-                                            _logger.LogInformation("Processing BUY order {OrderId} - creating new LONG position", orderId);
-                                            // Create new LONG position for BUY orders
-                                            var position = await positionManager.CreatePositionFromOrderAsync(finalizedDetails, "LONG");
-                                            _logger.LogInformation("Created new LONG position {PositionId} for order {OrderId}", position.position_uuid, orderId);
+                                            var originalPositionType = orderRequest.PositionType?.ToUpperInvariant();
+                                            
+                                            if (originalPositionType == "LONG")
+                                            {
+                                                _logger.LogInformation("Processing BUY order {OrderId} - creating new LONG position", orderId);
+                                                var position = await positionManager.CreatePositionFromOrderAsync(finalizedDetails, "LONG");
+                                                _logger.LogInformation("Created new LONG position {PositionId} for order {OrderId}", position.position_uuid, orderId);
+                                            }
+                                            else if (originalPositionType == "BUY")
+                                            {
+                                                _logger.LogInformation("Processing BUY order {OrderId} - creating new BUY position", orderId);
+                                                var position = await positionManager.CreatePositionFromOrderAsync(finalizedDetails, "BUY");
+                                                _logger.LogInformation("Created new BUY position {PositionId} for order {OrderId}", position.position_uuid, orderId);
+                                            }
+                                            else if (originalPositionType == "OFFLOAD")
+                                            {
+                                                _logger.LogInformation("Processing BUY order {OrderId} with OFFLOAD - finding and closing SHORT positions", orderId);
+                                                try
+                                                {
+                                                    // Automatically find and close SHORT positions
+                                                    var position = await positionManager.UpdatePositionFromClosingOrderAsync(finalizedDetails, "SHORT");
+                                                    _logger.LogInformation("Updated SHORT position {PositionId} for order {OrderId}", position.position_uuid, orderId);
+                                                }
+                                                catch (InvalidOperationException ex)
+                                                {
+                                                    _logger.LogWarning("BUY order {OrderId} completed but no open SHORT position found to close: {Message}", orderId, ex.Message);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                _logger.LogWarning("BUY order {OrderId} with unknown position type: {PositionType}", orderId, originalPositionType);
+                                            }
                                         }
                                         else if (finalizedDetails.Trade_Type == "SELL")
                                         {
@@ -150,16 +178,16 @@ namespace crypto_bot_api.Controllers
                                             
                                             if (originalPositionType == "OFFLOAD")
                                             {
-                                                _logger.LogInformation("Processing SELL order {OrderId} with OFFLOAD - finding and closing position", orderId);
+                                                _logger.LogInformation("Processing SELL order {OrderId} with OFFLOAD - finding and closing LONG positions", orderId);
                                                 try
                                                 {
-                                                    // Automatically find and close the appropriate position
-                                                    var position = await positionManager.UpdatePositionFromClosingOrderAsync(finalizedDetails);
-                                                    _logger.LogInformation("Updated position {PositionId} for order {OrderId}", position.position_uuid, orderId);
+                                                    // Automatically find and close LONG positions
+                                                    var position = await positionManager.UpdatePositionFromClosingOrderAsync(finalizedDetails, "LONG");
+                                                    _logger.LogInformation("Updated LONG position {PositionId} for order {OrderId}", position.position_uuid, orderId);
                                                 }
                                                 catch (InvalidOperationException ex)
                                                 {
-                                                    _logger.LogWarning("SELL order {OrderId} completed but no open position found to close: {Message}", orderId, ex.Message);
+                                                    _logger.LogWarning("SELL order {OrderId} completed but no open LONG position found to close: {Message}", orderId, ex.Message);
                                                 }
                                             }
                                             else if (originalPositionType == "SHORT")
@@ -219,7 +247,7 @@ namespace crypto_bot_api.Controllers
                 {
                     Order = result,
                     ValidationResult = validation,
-                    PositionType = orderRequest.PositionType,
+                    PositionType = orderRequest.PositionType ?? string.Empty,
                     ClientOrderId = orderRequest.ClientOrderId
                 };
                 
