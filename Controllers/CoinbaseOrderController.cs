@@ -131,7 +131,13 @@ namespace crypto_bot_api.Controllers
                                 _logger.LogInformation("Order {OrderId} completed with status: {Status}", orderId, finalizedDetails.Status);
                                 
                                 // Handle position management based on order status and type
-                                if (finalizedDetails.Status == "FILLED" && !string.IsNullOrEmpty(finalizedDetails.Trade_Type) && !string.IsNullOrEmpty(orderRequest.PositionType))
+                                if (string.IsNullOrEmpty(orderRequest.PositionType))
+                                {
+                                    _logger.LogInformation("Order {OrderId} completed with status {Status}, position management skipped (no position_type provided)", orderId, finalizedDetails.Status);
+                                    return;
+                                }
+                                
+                                if (finalizedDetails.Status == "FILLED" && !string.IsNullOrEmpty(finalizedDetails.Trade_Type))
                                 {
                                     _logger.LogInformation("Order {OrderId} is FILLED with Trade_Type: {TradeType}", orderId, finalizedDetails.Trade_Type);
                                     try
@@ -248,7 +254,7 @@ namespace crypto_bot_api.Controllers
                     Order = result,
                     ValidationResult = validation,
                     PositionType = orderRequest.PositionType ?? string.Empty,
-                    ClientOrderId = orderRequest.ClientOrderId
+                    ClientOrderId = orderRequest.ClientOrderId ?? string.Empty
                 };
                 
                 _logger.LogInformation("Returning order response: {Response}", orderResponse.Order?.ToJsonString() ?? "NULL");
