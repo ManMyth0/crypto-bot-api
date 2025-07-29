@@ -25,6 +25,7 @@ Currently an API service that integrates with the Coinbase Advanced Trade API to
 - Retrieve account information from Coinbase
 - Support for finding accounts with positive balances
 - Properly formatted JWT claims for Coinbase compatibility
+- Sophisticated rate limiting with exponential backoff and retry logic
 - Authentication with Coinbase Advanced Trade API using Ed25519 JWT signing
 
 ## Getting Started
@@ -98,6 +99,24 @@ The API will be available at `http://localhost:5294` or whatever your local host
 ### Order Endpoints
 - `POST /api/CoinbaseOrder/orders` - Create an order with optional position tracking
 - `GET /api/CoinbaseOrder/historical/fills` - Get historical fill information for orders with optional filtering
+- `GET /api/CoinbaseOrder/historical/batch` - Get historical order information with optional filtering
+
+## Order Processing
+
+### Order Lifecycle
+1. **Order Creation**: User submits order request
+2. **Validation**: Comprehensive pre-trade validation
+3. **API Submission**: Order sent to Coinbase Advanced Trade API
+4. **Immediate Response**: Order response returned to user immediately
+5. **Background Monitoring**: Asynchronous order status monitoring (5-second polling, 30-minute timeout)
+6. **Position Management**: Optional position tracking, decided upon order placement
+
+### Background Processing
+- **Polling Interval**: 5 seconds
+- **Default Timeout**: 30 minutes
+- **GTD Orders**: Respects end_time for timeout calculation
+- **Max Attempts**: 1000 polling attempts (safety limit)
+- **Retry Logic**: 3 retries for API errors with exponential backoff
 
 ## Order Validation
 
@@ -112,8 +131,8 @@ The API performs comprehensive validation before submitting orders to Coinbase:
 - Validates base size against product's base_increment
 - Ensures order meets minimum funds requirement
 - Checks quote size formatting and validity
-
-- **For limit orders**: Requires either `base_size` OR `quote_size`, but not both
+- **For market orders**: Only `quote_size` is required
+- **For limit orders**: Either `base_size` OR `quote_size` is required (not both)
 
 ### Validation Response
 Instead of failing with errors, the API returns a ValidationResult containing:
@@ -144,8 +163,20 @@ The API supports optional position tracking for trade management:
   - **"BUY"**: Used with BUY orders for simple purchases not tied to trading strategy
   - **Omitted / null**: Skips position management entirely for simple trading
 - When provided, used to track position direction and calculate P&L
-- When omitted, the position/asset management system is bypassed
-- Works in conjunction with `position_id` for closing trades when position tracking is enabled
+- When omitted, the position / asset management system is bypassed
+- Positions are automatically found and closed based on `position_type` and `side` combination using the earliest record_opened_at timestamp
+- `position_id` field exists in the DTO but is not currently used in the API implementation
+
+### Side & Position Type Combinations
+
+| Side | Position Type | Action | Description |
+|------|---------------|--------|-------------|
+| BUY | LONG | Create new LONG position | Opens a new long position for trading strategy |
+| BUY | BUY | Create new BUY position | Simple purchase not tied to trading strategy |
+| BUY | OFFLOAD | Close SHORT positions | Closes existing short positions (FIFO) |
+| SELL | SHORT | Create new SHORT position | Opens a new short position for trading strategy |
+| SELL | OFFLOAD | Close LONG positions | Closes existing long positions (FIFO) |
+| BUY / SELL | null / omitted | No position tracking | Simple trading without position management |
 
 ## Order Request Format
 
@@ -172,7 +203,7 @@ For trades with position tracking and management:
     "product_id": "BTC-USD",
     "side": "BUY",  // or "SELL"
     "position_type": "LONG",  // "LONG", "SHORT", "OFFLOAD", or "BUY" - Optional for position tracking, is case insensitive
-    "position_id": "optional-uuid", // For closing trades. Omit for opening new positions
+    "position_id": "optional-uuid", // Currently unused in the API implementation
     "order_configuration": {
         "market_market_ioc": {
             // For market orders, only quote_size is required
@@ -197,17 +228,24 @@ For trades with position tracking and management:
 ### Position Management Tables
 
 - `Trade_Records` - Tracks overall position status and P&L
-  - UUID-based position tracking
-  - Filtered indexes for open positions
-  - Decimal(18,8) precision for crypto values
+  - UUID-based position tracking (`position_uuid`)
+  - Position types: "LONG", "SHORT", "OFFLOAD", "BUY" (max 10 chars)
+  - Asset pairs (max 20 chars)
+  - Decimal(18,8) precision for all monetary values
+  - Filtered indexes for efficient open position queries
+  - Automatic timestamp generation (`record_opened_at`)
 
 - `Opening_Trades` - Initial position establishment
-  - Links to Trade_Records
-  - Tracks entry price and quantity
+  - Links to Trade_Records via `position_uuid`
+  - Side field supports: "BUY", "SELL", "LONG", "SHORT", "OFFLOAD", "BUY" (max 10 chars)
+  - Tracks entry price, quantity, and commission
+  - Trade ID from Coinbase (max 255 chars)
 
 - `Closing_Trades` - Position closure tracking
   - Links to both Trade_Records and Opening_Trades
+  - Side field always "BUY" or "SELL" (max 10 chars)
   - Supports partial position closure
+  - Tracks offloaded quantity, price, and commission
 
 ### Product Information Table
 
@@ -249,6 +287,20 @@ Example asset-pair:
 - `limit_limit_gtd` - Good Till Date limit orders (GTD)
 - `limit_limit_gtc` - Good Till Canceled limit orders (GTC)
 - `market_market_ioc` - Immediate-or-Cancel market orders (IOC)
+
+## Error Handling & Reliability
+
+### Error Handling Strategy
+- **Validation Errors**: Return detailed validation results instead of failing
+- **API Errors**: Automatic retry with exponential backoff (3 attempts)
+- **Timeout Handling**: Configurable timeouts with proper cancellation
+- **Database Transactions**: ACID compliance for position management
+- **Graceful Degradation**: Continues operation even if some services fail
+
+### Rate Limiting
+- **Automatic Rate Limiting**: Built-in rate limiting for Coinbase API calls
+- **Exponential Backoff**: Intelligent retry logic for failed requests
+- **Request Queuing**: Proper request queuing to respect API limits
 
 ## Technologies Used
 
