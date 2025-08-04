@@ -137,7 +137,7 @@ The API performs comprehensive validation before submitting orders to Coinbase:
 - **For limit orders**: Either `base_size` OR `quote_size` is required (not both)
 
 ### Validation Response
-Instead of failing with errors, the API returns a ValidationResult containing:
+The API performs validation before submitting orders and returns a ValidationResult containing:
 ```json
 {
     "isValid": true,
