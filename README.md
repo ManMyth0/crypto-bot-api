@@ -56,17 +56,17 @@ The API uses user secrets for configuration. You'll need to set up the following
 }
 ```
 
-2. Replace `YOUR_POSTGRES_DATABASE` and `YOUR_POSTGRES_DATABASE_PASSWORD` with your Postgres credentials.
-3. Replace `YOUR_API_KEY_ID` and `YOUR_API_SECRET` with your Coinbase API credentials.
+1. Replace `YOUR_POSTGRES_DATABASE` and `YOUR_POSTGRES_DATABASE_PASSWORD` with your Postgres credentials.
+2. Replace `YOUR_API_KEY_ID` and `YOUR_API_SECRET` with your Coinbase API credentials.
 
 ### Sandbox Mode
 
 The API supports Coinbase's sandbox environment for testing purposes. To enable sandbox mode:
 
-3. No authentication is required in sandbox mode
-1. Set `"Sandbox": { "Enabled": true }` in your secrets configuration
-4. Sandbox provides standardized test responses for order creation and management
-2. The API will automatically switch to use sandbox endpoints (`https://api-sandbox.coinbase.com`)
+1. No authentication is required in sandbox mode
+2. Set `"Sandbox": { "Enabled": true }` in your secrets configuration
+3. Sandbox provides standardized test responses for order creation and management
+4. The API will automatically switch to use sandbox endpoints (`https://api-sandbox.coinbase.com`)
 
 **Sandbox Limitations:**
 - Individual order lookup is not supported
